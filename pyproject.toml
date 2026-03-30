@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "accordionq2"
+version = "1.0.0"
+description = "Python client for the AccordionQ2 Hardware Management REST API"
+requires-python = ">=3.8"
+license = {text = "Proprietary"}
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+include = ["accordionq2*"]
+
+[tool.pytest.ini_options]
+markers = ["integration: marks tests as integration tests (require hardware)"]
