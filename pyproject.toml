@@ -16,4 +16,4 @@ dev = ["pytest>=7"]
 include = ["accordionq2*"]
 
 [tool.pytest.ini_options]
-markers = ["integration: marks tests as integration tests (require hardware)"]
+markers = ["integration: marks tests as integration tests (require hardware)", "performance: marks throughput/latency benchmarks (require hardware)"]
