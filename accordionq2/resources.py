@@ -17,7 +17,7 @@ class ResourcesGroup(ApiGroupBase):
     def get_value(self, name):
         """Read the current value of a single resource."""
         result = self._post_json("api/resources/value/get", {"Name": name})
-        return result["Value"]
+        return result["value"]
 
     def set_value(self, name, value):
         """Set the value of a single resource."""
@@ -29,7 +29,7 @@ class ResourcesGroup(ApiGroupBase):
         Returns a dict mapping each resource name to its current value string.
         """
         result = self._post_json("api/resources/values/get", {"Names": names})
-        return result["Resources"]
+        return result["resources"]
 
     def set_values(self, resources):
         """Set values for multiple resources in one round-trip.
@@ -47,4 +47,4 @@ class ResourcesGroup(ApiGroupBase):
         result = self._post_json(
             "api/resources/transact", {"Name": name, "Value": value}
         )
-        return result["Value"]
+        return result["value"]

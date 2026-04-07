@@ -26,8 +26,8 @@ class ConnectionStatusDto:
     @classmethod
     def from_dict(cls, data):
         return cls(
-            is_connected=data.get("IsConnected", False),
-            last_error=data.get("LastError"),
+            is_connected=data.get("isConnected", False),
+            last_error=data.get("lastError"),
         )
 
 
@@ -47,15 +47,15 @@ class AppLicenseDto:
 
     @classmethod
     def from_dict(cls, data):
-        raw_type = data.get("Type", "Unknown")
+        raw_type = data.get("type", "Unknown")
         try:
             app_type = AppTypes(raw_type)
         except ValueError:
             app_type = AppTypes.UNKNOWN
         return cls(
-            name=data.get("Name", ""),
-            key=data.get("Key", ""),
-            expires=data.get("Expires", ""),
+            name=data.get("name", ""),
+            key=data.get("key", ""),
+            expires=data.get("expires", ""),
             type=app_type,
         )
 
@@ -84,13 +84,13 @@ class ModuleSettingsDto:
     @classmethod
     def from_dict(cls, data):
         return cls(
-            name=data.get("Name", ""),
-            enabled=data.get("Enabled", False),
-            class_name=data.get("ClassName", ""),
-            assembly_path=data.get("AssemblyPath", ""),
-            namespace=data.get("Namespace", ""),
-            image_name=data.get("ImageName", ""),
-            initial_data=data.get("InitialData") or {},
+            name=data.get("name", ""),
+            enabled=data.get("enabled", False),
+            class_name=data.get("className", ""),
+            assembly_path=data.get("assemblyPath", ""),
+            namespace=data.get("namespace", ""),
+            image_name=data.get("imageName", ""),
+            initial_data=data.get("initialData") or {},
         )
 
     def to_dict(self):
@@ -124,11 +124,11 @@ class PhysicalModuleDto:
     @classmethod
     def from_dict(cls, data):
         return cls(
-            index=data.get("Index", 0),
-            name=data.get("Name", ""),
-            product_id=data.get("ProductID", ""),
-            revision=data.get("Revision", 0),
-            serial_number=data.get("SerialNumber", ""),
+            index=data.get("index", 0),
+            name=data.get("name", ""),
+            product_id=data.get("productID", ""),
+            revision=data.get("revision", 0),
+            serial_number=data.get("serialNumber", ""),
         )
 
 
@@ -155,15 +155,15 @@ class PhysicalSystemDto:
 
     @classmethod
     def from_dict(cls, data):
-        modules_data = data.get("Modules") or []
+        modules_data = data.get("modules") or []
         return cls(
-            host=data.get("Host", ""),
-            eth_ip_v4=data.get("EthIpV4", ""),
-            eth_ip_v6=data.get("EthIpV6", ""),
-            firmware=data.get("Firmware", ""),
-            mac=data.get("MAC", ""),
+            host=data.get("host", ""),
+            eth_ip_v4=data.get("ethIpV4", ""),
+            eth_ip_v6=data.get("ethIpV6", ""),
+            firmware=data.get("firmware", ""),
+            mac=data.get("mac", ""),
             modules=[PhysicalModuleDto.from_dict(m) for m in modules_data],
-            network_interfaces=data.get("NetworkInterfaces") or {},
+            network_interfaces=data.get("networkInterfaces") or {},
         )
 
 
@@ -217,29 +217,29 @@ class ChannelDto:
 
     @classmethod
     def from_dict(cls, data):
-        raw_usage = data.get("Usage", "Undefined")
+        raw_usage = data.get("usage", "Undefined")
         try:
             usage = MpioUsageTypes(raw_usage)
         except ValueError:
             usage = MpioUsageTypes.UNDEFINED
         return cls(
-            channel_index=data.get("ChannelIndex", 0),
-            index=data.get("Index", 0),
-            enabled=data.get("Enabled", False),
+            channel_index=data.get("channelIndex", 0),
+            index=data.get("index", 0),
+            enabled=data.get("enabled", False),
             usage=usage,
-            device_name=data.get("DeviceName", ""),
-            channel_type=parse_channel_types(data.get("ChannelType", 0)),
-            channel_type_capability=parse_channel_types(data.get("ChannelTypeCapability", 0)),
-            alias=data.get("Alias", ""),
-            net_name=data.get("NetName", ""),
-            group_name=data.get("GroupName", ""),
-            capability=parse_direction_types(data.get("Capability", 0)),
-            description=data.get("Description", ""),
-            direction=parse_direction_types(data.get("Direction", 0)),
-            direction_changed=data.get("DirectionChanged", False),
-            default_direction=parse_direction_types(data.get("DefaultDirection", 0)),
-            unit=data.get("Unit", ""),
-            is_virtual=data.get("IsVirtual", False),
+            device_name=data.get("deviceName", ""),
+            channel_type=parse_channel_types(data.get("channelType", 0)),
+            channel_type_capability=parse_channel_types(data.get("channelTypeCapability", 0)),
+            alias=data.get("alias", ""),
+            net_name=data.get("netName", ""),
+            group_name=data.get("groupName", ""),
+            capability=parse_direction_types(data.get("capability", 0)),
+            description=data.get("description", ""),
+            direction=parse_direction_types(data.get("direction", 0)),
+            direction_changed=data.get("directionChanged", False),
+            default_direction=parse_direction_types(data.get("defaultDirection", 0)),
+            unit=data.get("unit", ""),
+            is_virtual=data.get("isVirtual", False),
         )
 
 
