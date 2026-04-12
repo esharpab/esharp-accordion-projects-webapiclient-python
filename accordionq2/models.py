@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from .enums import (
     AppTypes,
+    BusActions,
     ChannelTypes,
     DirectionTypes,
     MpioUsageTypes,
@@ -295,3 +296,75 @@ class ChannelConfigRequest:
         if self.device_name is not None:
             result["DeviceName"] = self.device_name
         return result
+
+
+@dataclass
+class BusTransactionResponse:
+    """Result of a raw bus transaction (I2C, UART, SPI, or Socket)."""
+
+    device_name: str = ""
+    action: str = ""
+    received: bytes = b""
+    number_of_bytes_received: int = 0
+
+    @classmethod
+    def from_dict(cls, data):
+        raw = data.get("received") or ""
+        try:
+            received = bytes.fromhex(raw) if raw else b""
+        except Exception:
+            received = b""
+        return cls(
+            device_name=data.get("deviceName", ""),
+            action=data.get("action", ""),
+            received=received,
+            number_of_bytes_received=data.get("numberOfBytesReceived", len(received)),
+        )
+
+
+@dataclass
+class NumericResultChannelDto:
+    """Describes one NumericResult channel and its sampling capabilities."""
+
+    net_name: str = ""
+    alias: str = ""
+    possible_target_names: list = field(default_factory=list)
+    sample_rate: int = 0
+    default_samples: int = 0
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            net_name=data.get("netName", ""),
+            alias=data.get("alias", ""),
+            possible_target_names=data.get("possibleTargetNames") or [],
+            sample_rate=data.get("sampleRate", 0),
+            default_samples=data.get("defaultSamples", 0),
+        )
+
+
+@dataclass
+class NumericMeasureResultDto:
+    """Acquisition metadata returned after a successful measure call."""
+
+    channel_net_name: str = ""
+    target_net_name: str = ""
+    sample_count: int = 0
+    sample_rate: int = 0
+    reduced_set: bool = True
+    started: str = ""
+    stopped: str = ""
+    duration: str = ""
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            channel_net_name=data.get("channelNetName", ""),
+            target_net_name=data.get("targetNetName", ""),
+            sample_count=data.get("sampleCount", 0),
+            sample_rate=data.get("sampleRate", 0),
+            reduced_set=data.get("reducedSet", True),
+            started=data.get("started", ""),
+            stopped=data.get("stopped", ""),
+            duration=data.get("duration", ""),
+        )

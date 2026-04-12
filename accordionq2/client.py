@@ -2,9 +2,11 @@
 
 from .application import ApplicationGroup
 from .channels import ChannelsGroup
+from .comm import CommGroup
 from .connection import ConnectionGroup
 from .media import MediaGroup
 from .modules import ModulesGroup
+from .numeric_results import NumericResultsGroup
 from .resources import ResourcesGroup
 
 
@@ -36,6 +38,8 @@ class AccordionQ2Client:
         self.application = ApplicationGroup(base, timeout)
         self.media = MediaGroup(base, timeout)
         self.connection = ConnectionGroup(base, timeout)
+        self.comm = CommGroup(base, timeout)
+        self.numeric_results = NumericResultsGroup(base, timeout)
 
     def __enter__(self):
         return self
