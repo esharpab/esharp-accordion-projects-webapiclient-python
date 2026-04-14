@@ -1,5 +1,6 @@
 """Main client for the AccordionQ2 REST API."""
 
+from ._base import HttpSession
 from .application import ApplicationGroup
 from .channels import ChannelsGroup
 from .comm import CommGroup
@@ -12,6 +13,9 @@ from .resources import ResourcesGroup
 
 class AccordionQ2Client:
     """Client for the AccordionQ2 Hardware Management REST API.
+
+    Uses a persistent HTTP connection so that DNS is resolved only once
+    per client lifetime, avoiding the ~625 ms mDNS penalty on Windows.
 
     Usage::
 
@@ -31,22 +35,22 @@ class AccordionQ2Client:
     """
 
     def __init__(self, base_url, timeout=30.0):
-        base = base_url.rstrip("/")
-        self.resources = ResourcesGroup(base, timeout)
-        self.channels = ChannelsGroup(base, timeout)
-        self.modules = ModulesGroup(base, timeout)
-        self.application = ApplicationGroup(base, timeout)
-        self.media = MediaGroup(base, timeout)
-        self.connection = ConnectionGroup(base, timeout)
-        self.comm = CommGroup(base, timeout)
-        self.numeric_results = NumericResultsGroup(base, timeout)
+        self._session = HttpSession(base_url, timeout)
+        self.resources = ResourcesGroup(self._session)
+        self.channels = ChannelsGroup(self._session)
+        self.modules = ModulesGroup(self._session)
+        self.application = ApplicationGroup(self._session)
+        self.media = MediaGroup(self._session)
+        self.connection = ConnectionGroup(self._session)
+        self.comm = CommGroup(self._session)
+        self.numeric_results = NumericResultsGroup(self._session)
 
     def __enter__(self):
         return self
 
     def __exit__(self, *exc):
-        pass
+        self.close()
 
     def close(self):
-        """Close the client (no-op; provided for API symmetry)."""
-        pass
+        """Close the underlying persistent HTTP connection."""
+        self._session.close()

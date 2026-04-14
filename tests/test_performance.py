@@ -36,6 +36,14 @@ def test_get_uptime_1000_roundtrips(client):
     print("  Average    : {:.2f} ms/request".format(avg_ms))
     print("  Throughput : {:.1f} req/s".format(iterations / elapsed))
 
+    # Guard against DNS-per-request regressions (urllib ~625 ms/req on
+    # Windows mDNS).  With a persistent connection the average should be
+    # well under 100 ms even on modest hardware.
+    assert avg_ms < 100, (
+        "Average latency {:.1f} ms/request exceeds 100 ms — "
+        "possible per-request DNS resolution regression".format(avg_ms)
+    )
+
 
 def test_rainbow_leds_cycle_colors(client):
     """Cycle LED channels through rainbow colors and measure throughput."""
@@ -75,3 +83,33 @@ def test_rainbow_leds_cycle_colors(client):
     # Reset all to off
     for ch in channels:
         client.resources.set_value(ch, "Black")
+
+
+def test_connection_reuse_latency(client):
+    """Verify the persistent connection removes per-request DNS overhead.
+
+    After a warm-up request (which resolves DNS and opens the socket),
+    subsequent requests should be significantly faster.  On Windows with
+    mDNS (.local) names, a per-request DNS lookup adds ~625 ms.  With
+    connection reuse the second request should be well under 200 ms.
+    """
+    # The session-scoped client fixture has already made requests, so the
+    # connection is warm.  Measure a burst of 10 back-to-back requests.
+    burst = 10
+    times = []
+    for _ in range(burst):
+        t0 = time.perf_counter()
+        client.resources.get_value(UPTIME_RESOURCE)
+        times.append((time.perf_counter() - t0) * 1000)
+
+    avg_ms = sum(times) / len(times)
+    max_ms = max(times)
+
+    print("Connection-reuse burst ({} requests):".format(burst))
+    print("  Average : {:.2f} ms".format(avg_ms))
+    print("  Max     : {:.2f} ms".format(max_ms))
+
+    assert avg_ms < 200, (
+        "Average burst latency {:.1f} ms exceeds 200 ms — "
+        "connection may not be reused".format(avg_ms)
+    )
