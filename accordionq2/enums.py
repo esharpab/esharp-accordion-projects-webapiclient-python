@@ -35,6 +35,18 @@ class MpioUsageTypes(str, Enum):
     BUS_SIGNAL = "BusSignal"
 
 
+class BusActions(str, Enum):
+    """Bus transaction action, mirroring ``BusTransactionTypes.BusActions``."""
+    UNDEFINED     = "Undefined"
+    SEND          = "Send"
+    RECEIVE       = "Receive"
+    SEND_RECEIVE  = "SendReceive"
+    SCAN          = "Scan"
+    BREAK         = "Break"
+    CLEAR_BUFFERS = "ClearBuffers"
+    RECONFIGURE   = "Reconfigure"
+
+
 class ChannelTypes(IntFlag):
     """Hardware channel type flags."""
     UNDEFINED = 0
