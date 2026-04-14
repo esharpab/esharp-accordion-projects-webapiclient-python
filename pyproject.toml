@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "accordionq2"
-version = "1.0.0"
+version = "1.0.1"
 description = "Python client for the AccordionQ2 Hardware Management REST API"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -14,7 +14,7 @@ dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/esharpab/esharp-accordion-projects-webapiclient-python"
-Documentation = "https://accordionq2.readthedocs.io/"
+Documentation = "https://esharp-accordion-projects-webapiclient-python.readthedocs.io/en/latest/"
 PyPI = "https://pypi.org/project/accordionq2/"
 "NuGet (.NET)" = "https://www.nuget.org/packages/AccordionQ2.WebApiClient/"
 

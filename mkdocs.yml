@@ -1,6 +1,6 @@
 site_name: AccordionQ2 Python Client
 site_description: Python client library for the AccordionQ2 Hardware Management REST API
-site_url: https://accordionq2.readthedocs.io/
+site_url: https://esharp-accordion-projects-webapiclient-python.readthedocs.io/en/latest/
 repo_url: https://github.com/esharpab/esharp-accordion-projects-webapiclient-python
 repo_name: GitHub
 

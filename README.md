@@ -8,6 +8,7 @@ natural.
 
 [![PyPI](https://img.shields.io/pypi/v/accordionq2)](https://pypi.org/project/accordionq2/)
 [![NuGet](https://img.shields.io/nuget/v/AccordionQ2.WebApiClient)](https://www.nuget.org/packages/AccordionQ2.WebApiClient/)
+[![Documentation](https://readthedocs.org/projects/esharp-accordion-projects-webapiclient-python/badge/?version=latest)](https://esharp-accordion-projects-webapiclient-python.readthedocs.io/en/latest/)
 
 ## Requirements
 

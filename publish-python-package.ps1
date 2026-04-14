@@ -59,7 +59,7 @@ param(
 
     [string]$Repository = "pypi",
 
-    [string]$ApiKey = "pypi-AgEIcHlwaS5vcmcCJGRkOWZhN2JhLWRjMzMtNDI2NS04MGRkLTU5OTlmNDBjNmE2NQACKlszLCI0YmNkODlhMi02MWVhLTQyYWItYThmMC0zNGEwYjE0ZmY3MzUiXQAABiCL3iWwvHC5EJjVfavJ2xvWniHK9Zn9BxzvYb1TvifaKw",
+    [string]$ApiKey,
 
     [switch]$SkipTests
 )
@@ -73,6 +73,17 @@ $VenvDir       = Join-Path $ProjectRoot ".venv"
 $DistDir       = Join-Path $ProjectRoot "dist"
 $PyProject     = Join-Path $ProjectRoot "pyproject.toml"
 $InitPy        = Join-Path $ProjectRoot "accordionq2" "__init__.py"
+
+# ── Load PyPI token from file if not provided ────────────────────────────────
+if (-not $ApiKey) {
+    $TokenFile = Join-Path $ProjectRoot ".pypi-token"
+    if (Test-Path $TokenFile) {
+        $ApiKey = (Get-Content $TokenFile -Raw).Trim()
+        Write-Host "Loaded PyPI token from .pypi-token" -ForegroundColor Green
+    } else {
+        Write-Warning "No -ApiKey provided and .pypi-token file not found. Publish will fail."
+    }
+}
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 function Write-Step([string]$msg) {

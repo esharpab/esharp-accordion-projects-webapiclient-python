@@ -11,3 +11,4 @@ build/
 venv/
 site/
 obj/
+.pypi-token
