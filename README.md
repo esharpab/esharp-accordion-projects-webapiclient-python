@@ -2,9 +2,12 @@
 
 Python client library for the **AccordionQ2 Hardware Management REST API**.
 This is the Python counterpart of the
-[.NET WebApiClient](https://git.esharp.se/esharp/accordion-projects/webapiclient);
+[.NET WebApiClient](https://www.nuget.org/packages/AccordionQ2.WebApiClient/);
 both libraries expose the same API surface so switching between them feels
 natural.
+
+[![PyPI](https://img.shields.io/pypi/v/accordionq2)](https://pypi.org/project/accordionq2/)
+[![NuGet](https://img.shields.io/nuget/v/AccordionQ2.WebApiClient)](https://www.nuget.org/packages/AccordionQ2.WebApiClient/)
 
 ## Requirements
 
@@ -24,10 +27,10 @@ development):
 pip install -e .
 ```
 
-Or, for a regular install:
+Or install from [PyPI](https://pypi.org/project/accordionq2/):
 
 ```bash
-pip install .
+pip install accordionq2
 ```
 
 ## Quick Start
@@ -229,6 +232,124 @@ with open("waveform.bin", "wb") as fp:
 
 ---
 
+### `client.comm` &mdash; Raw Bus Transactions (I2C, UART, SPI, Socket)
+
+All byte data is **hex-encoded** on the wire. The client handles
+encoding and decoding transparently &mdash; callers work with plain
+`bytes` objects. `BusTransactionResponse.received` is always `bytes`.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `i2c(device_name, address, action, ...)` | `BusTransactionResponse` | I2C bus transaction (Send, Receive, SendReceive, or Scan). |
+| `uart(device_name, action, ...)` | `BusTransactionResponse` | UART transaction (Send, Receive, SendReceive, or ClearBuffers). |
+| `spi(device_name, action, ...)` | `BusTransactionResponse` | SPI transaction (Send, Receive, or SendReceive). |
+| `socket(device_name, action, ...)` | `BusTransactionResponse` | TCP socket transaction (Send, Receive, or SendReceive). |
+
+**I2C parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `device_name` | `str` | Device name as registered in the hardware manager |
+| `address` | `int` | I2C 7-bit device address (0&ndash;127) |
+| `action` | `BusActions` | `SEND`, `RECEIVE`, `SEND_RECEIVE`, or `SCAN` |
+| `data_to_send` | `bytes` | Bytes to transmit (required for Send/SendReceive) |
+| `number_of_bytes_to_receive` | `int` | Expected byte count for Receive/SendReceive |
+| `max_retries` | `int` | Retry limit on NAK (`-1` = device default) |
+
+```python
+from accordionq2.enums import BusActions
+
+# I2C: scan the bus for connected devices
+resp = client.comm.i2c("0.ESH10000597.I2C00", address=0x00,
+                       action=BusActions.SCAN)
+for addr in resp.received:
+    print(f"Found device at 0x{addr:02X}")
+
+# I2C: write two bytes to address 0x50
+client.comm.i2c("0.ESH10000597.I2C00", address=0x50,
+                action=BusActions.SEND,
+                data_to_send=bytes([0x00, 0x10]))
+
+# I2C: read 4 bytes from address 0x50
+resp = client.comm.i2c("0.ESH10000597.I2C00", address=0x50,
+                       action=BusActions.RECEIVE,
+                       number_of_bytes_to_receive=4)
+print(resp.received.hex())  # e.g. "aabbccdd"
+
+# UART: send a SCPI query and read the response
+resp = client.comm.uart("MyUartDevice",
+                        action=BusActions.SEND_RECEIVE,
+                        data_to_send=b"*IDN?\n",
+                        number_of_bytes_to_receive=64,
+                        timeout_ms=2000)
+print(resp.received.decode("ascii"))
+
+# SPI: full-duplex transfer
+resp = client.comm.spi("MySpiDevice",
+                       action=BusActions.SEND_RECEIVE,
+                       data_to_send=bytes([0xAA, 0xBB]),
+                       number_of_bytes_to_receive=2)
+
+# Socket: send a SCPI query over TCP
+resp = client.comm.socket("MySocketDevice",
+                          action=BusActions.SEND_RECEIVE,
+                          host_name="192.168.1.10", port=5025,
+                          data_to_send=b"*IDN?\n",
+                          number_of_bytes_to_receive=64)
+```
+
+---
+
+### `client.numeric_results` &mdash; Fast Numeric Sampling
+
+NumericResult channels perform high-speed acquisition on physical
+channels, computing summary statistics (mean, min, max, stdev)
+server-side.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `get_channels()` | `list[NumericResultChannelDto]` | All NumericResult channels with sampling capabilities. |
+| `get_targets(channel_net_name)` | `list[str]` | Physical channels that a NumericResult channel can sample. |
+| `measure(channel, target, samples, reduced_set)` | `NumericMeasureResultDto` | Trigger an acquisition (result cached server-side). |
+| `get_mean(channel_net_name)` | `float` | Mean of the last measurement. |
+| `get_min(channel_net_name)` | `float` | Minimum of the last measurement. |
+| `get_max(channel_net_name)` | `float` | Maximum of the last measurement. |
+| `get_stdev(channel_net_name)` | `float` | Standard deviation of the last measurement. |
+| `get_samples(channel_net_name)` | `list[float]` | Raw sample array (only if `reduced_set=False`). |
+
+**Typical workflow:**
+
+```python
+# 1. Discover available NumericResult channels
+channels = client.numeric_results.get_channels()
+for ch in channels:
+    print(f"{ch.net_name} (rate={ch.sample_rate} Hz)")
+
+# 2. Check what a channel can sample
+targets = client.numeric_results.get_targets(channels[0].net_name)
+print("Available targets:", targets)
+
+# 3. Trigger acquisition (result cached server-side)
+meta = client.numeric_results.measure(
+    channels[0].net_name, targets[0],
+    samples=1000, reduced_set=True)
+print(f"Acquired {meta.sample_count} samples in {meta.duration}")
+
+# 4. Fetch summary statistics
+mean  = client.numeric_results.get_mean(channels[0].net_name)
+stdev = client.numeric_results.get_stdev(channels[0].net_name)
+print(f"Mean = {mean:.6f}, StdDev = {stdev:.6f}")
+
+# 5. For raw samples, use reduced_set=False
+meta = client.numeric_results.measure(
+    channels[0].net_name, targets[0],
+    samples=100, reduced_set=False)
+samples = client.numeric_results.get_samples(channels[0].net_name)
+print(f"First 5 samples: {samples[:5]}")
+```
+
+---
+
 ## Models
 
 All models live in `accordionq2.models`.
@@ -243,6 +364,9 @@ All models live in `accordionq2.models`.
 | `PhysicalSystemDto` | Hardware topology (`host`, `mac`, `firmware`, `modules` list) |
 | `PhysicalModuleDto` | One hardware slot (`index`, `name`, `product_id`, `revision`, `serial_number`) |
 | `AppLicenseDto` | License info (`name`, `key`, `expires`, `type`) |
+| `BusTransactionResponse` | `device_name`, `action`, `received` (bytes), `number_of_bytes_received` |
+| `NumericResultChannelDto` | `net_name`, `alias`, `possible_target_names`, `sample_rate`, `default_samples` |
+| `NumericMeasureResultDto` | `channel_net_name`, `target_net_name`, `sample_count`, `sample_rate`, `reduced_set`, `started`, `stopped`, `duration` |
 
 Response models provide a `from_dict(data)` class method; request models
 provide a `to_dict()` instance method.
@@ -257,6 +381,7 @@ All enums live in `accordionq2.enums`.
 | `AppTypes` | `str, Enum` | `UNKNOWN`, `SOFTWARE_MODULE`, `HARDWARE_MODULE` |
 | `MpioUsageTypes` | `str, Enum` | `UNDEFINED`, `HIDDEN_SYSTEM_CONTROL`, `READ_ONLY_SYSTEM_CONTROL`, `USER_ALLOCATABLE`, `BUS_SIGNAL` |
 | `DirectionTypes` | `IntFlag` | `UNDEFINED`, `IN`, `OUT` |
+| `BusActions` | `str, Enum` | `UNDEFINED`, `SEND`, `RECEIVE`, `SEND_RECEIVE`, `SCAN`, `BREAK`, `CLEAR_BUFFERS`, `RECONFIGURE` |
 | `ChannelTypes` | `IntFlag` | `UNDEFINED`, `ANALOG`, `DIGITAL`, `TEMPERATURE`, `I2C`, `SPI`, `UART`, and many more |
 
 `IntFlag` enums support bitwise operations:
@@ -326,6 +451,8 @@ respective language:
 | Enums | `ChannelTypes.Analog` | `ChannelTypes.ANALOG` |
 | Errors | `AccordionQ2ApiException` | `AccordionQ2ApiError` |
 | Dependencies | Newtonsoft.Json | None (stdlib only) |
+| Install | `dotnet add package AccordionQ2.WebApiClient` | `pip install accordionq2` |
+| Package | [NuGet](https://www.nuget.org/packages/AccordionQ2.WebApiClient/) | [PyPI](https://pypi.org/project/accordionq2/) |
 
 ---
 
