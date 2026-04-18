@@ -1,14 +1,13 @@
 """Shared test configuration and fixtures for integration tests."""
 
 import os
+from urllib.parse import urlparse
 
 import pytest
 
 from accordionq2 import AccordionQ2Client
 
-DEFAULT_BASE_URL = "http://agent64.local:5000"
-
-# --- Well-known resource names on agent64 hardware ---
+# --- Well-known resource names
 CPU_TEMP_RESOURCE = "TempRegulator.CPU_TEMP"
 MON_3V3_RESOURCE = "0.1.ESH10000158.MON_3V3"
 MON_1V8_RESOURCE = "0.1.ESH10000158.MON_1V8"
@@ -35,15 +34,24 @@ LED_CHANNELS = [
     "0.11.ESH10000355.F1",
 ]
 
-# --- Physical system expectations ---
-EXPECTED_HOST_NAME = "agent64"
+# --- Physical system expectations (derived from ACCORDIONQ2_API_URL host) ---
+def _expected_host_name():
+    url = os.environ.get("ACCORDIONQ2_API_URL", "")
+    hostname = urlparse(url).hostname or ""
+    # Strip the .local mDNS suffix if present
+    return hostname.replace(".local", "")
+
+EXPECTED_HOST_NAME = _expected_host_name()
 BASE_MODULE_PRODUCT_ID = "ESH10000158"
 BASE_MODULE_NAME = "AGENT Q2 Base"
 
 
 @pytest.fixture(scope="session")
 def base_url():
-    return os.environ.get("ACCORDIONQ2_API_URL", DEFAULT_BASE_URL)
+    url = os.environ.get("ACCORDIONQ2_API_URL")
+    if not url:
+        pytest.exit("ACCORDIONQ2_API_URL environment variable must be set (e.g. http://mjsagent.local:5000)", returncode=1)
+    return url
 
 
 @pytest.fixture(scope="session")

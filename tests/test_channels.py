@@ -37,7 +37,12 @@ def test_get_channel_by_alias_analog(client):
 
 
 def test_get_channel_by_alias_adc(client):
-    ch = client.channels.get_channel(alias=ADC_CHANNEL_ALIAS)
+    try:
+        ch = client.channels.get_channel(alias=ADC_CHANNEL_ALIAS)
+    except AccordionQ2ApiError as exc:
+        if "not found" in str(exc).lower() or "no such" in str(exc).lower():
+            pytest.skip("ADC channel {} not present on this hardware: {}".format(ADC_CHANNEL_ALIAS, exc))
+        raise
     print("ADC channel: Alias={} | Type={} | Unit={}".format(
         ch.alias, ch.channel_type, ch.unit))
     assert ch.alias == ADC_CHANNEL_ALIAS

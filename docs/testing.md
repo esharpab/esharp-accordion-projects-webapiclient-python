@@ -13,22 +13,27 @@ pip install -e ".[dev]"
 
 ### Integration Tests
 
-Integration tests require a live AccordionQ2 device on the network:
+Integration tests require a live AccordionQ2 device on the network. The `ACCORDIONQ2_API_URL`
+environment variable **must** be set — there is no default:
 
 ```bash
-# Run all integration tests
-pytest tests/ -m integration -v
-
-# Override the default device URL
-ACCORDIONQ2_API_URL=http://mydevice:5000 pytest tests/ -m integration
+# Run all tests against a specific device
+ACCORDIONQ2_API_URL=http://mydevice.local:5000 pytest tests/ -v
 ```
 
-The default URL is `http://agent64.local:5000`.
+On Windows (PowerShell):
+
+```powershell
+$env:ACCORDIONQ2_API_URL = "http://mydevice.local:5000"
+pytest tests/ -v
+```
+
+If `ACCORDIONQ2_API_URL` is not set, pytest will exit immediately with an error.
 
 ### Performance Tests
 
 ```bash
-pytest tests/ -m performance -v
+ACCORDIONQ2_API_URL=http://mydevice.local:5000 pytest tests/ -m performance -v
 ```
 
 ## Test Markers
@@ -37,6 +42,12 @@ pytest tests/ -m performance -v
 |--------|-------------|
 | `integration` | Requires a live AccordionQ2 device |
 | `performance` | Performance/benchmarking tests |
+
+## Hardware-Specific Tests
+
+Some tests are automatically **skipped** when the connected hardware does not have the required
+modules or channels (e.g. ADC channels, LED tower). No manual configuration is needed — the
+test suite adapts to the target device at runtime.
 
 ## Using the Publish Script
 

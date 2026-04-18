@@ -37,7 +37,7 @@ def test_get_physical_system_returns_host_info(client):
     print("EthIpV6: {}".format(system.eth_ip_v6))
     print("MAC: {}".format(system.mac))
     print("Firmware: {}".format(system.firmware))
-    assert system.host == EXPECTED_HOST_NAME
+    assert system.host.lower() == EXPECTED_HOST_NAME.lower()
     assert system.eth_ip_v4, "Expected an IPv4 address"
 
 

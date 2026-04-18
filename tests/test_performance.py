@@ -4,6 +4,7 @@ import time
 
 import pytest
 
+from accordionq2 import AccordionQ2ApiError
 from tests.conftest import LED_CHANNELS, UPTIME_RESOURCE
 
 pytestmark = pytest.mark.performance
@@ -52,9 +53,14 @@ def test_rainbow_leds_cycle_colors(client):
     color_count = len(RAINBOW_COLORS)
     total_sets = 0
 
-    # Warm-up: set all channels to first color
+    # Warm-up: set all channels to first color — skip if hardware not present
     for ch in channels:
-        client.resources.set_value(ch, RAINBOW_COLORS[0])
+        try:
+            client.resources.set_value(ch, RAINBOW_COLORS[0])
+        except AccordionQ2ApiError as exc:
+            if "no such net name" in str(exc).lower() or "not found" in str(exc).lower():
+                pytest.skip("LED channel {} not present on this hardware: {}".format(ch, exc))
+            raise
 
     start = time.perf_counter()
 
