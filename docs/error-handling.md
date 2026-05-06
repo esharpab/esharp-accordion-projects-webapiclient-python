@@ -29,6 +29,10 @@ except AccordionQ2ApiError as e:
 | `status_code` | `int` | HTTP status code |
 | `message` | `str` | Error message from the server |
 
+The client automatically extracts error messages from RFC 7807 **ProblemDetails** responses
+(checking the `message`, `detail`, and `title` fields in that order), as well as plain-text
+and JSON error bodies.
+
 ## Pattern: Retry on Transient Errors
 
 ```python

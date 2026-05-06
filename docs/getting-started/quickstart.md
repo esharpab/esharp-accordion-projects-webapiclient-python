@@ -12,10 +12,13 @@ client = AccordionQ2Client("http://agent64.local:5000")
 
 ### Constructor Parameters
 
-| Parameter  | Type    | Default | Description |
-|------------|---------|---------|-------------|
-| `base_url` | `str`   | —       | Base URL of the AccordionQ2 WebApi, e.g. `"http://raspberrypi:5000"` |
-| `timeout`  | `float` | `30.0`  | HTTP request timeout in seconds |
+| Parameter         | Type                      | Default | Description |
+|-------------------|---------------------------|---------|-------------|
+| `base_url`        | `str`                     | —       | Base URL of the AccordionQ2 WebApi, e.g. `"http://raspberrypi:5000"` |
+| `timeout`         | `float`                   | `30.0`  | HTTP request timeout in seconds |
+| `auth`            | `tuple[str, str] \| None` | `None`  | Optional `(username, password)` for HTTP Basic Auth |
+| `verify`          | `bool \| str`             | `True`  | TLS certificate verification. `False` disables (useful for self-signed certs on embedded devices). A string is treated as a path to a CA bundle file. |
+| `default_headers` | `dict[str, str] \| None`  | `None`  | Additional headers merged into every request (e.g. `{"X-Api-Key": "secret"}`) |
 
 ### Using a Context Manager
 
@@ -33,6 +36,23 @@ The client also works without a context manager:
 client = AccordionQ2Client("http://agent64.local:5000")
 names = client.resources.get_names()
 client.close()
+```
+
+### Authentication and TLS
+
+```python
+# HTTP Basic Auth
+with AccordionQ2Client("https://device.local:5001", auth=("admin", "secret")) as client:
+    names = client.resources.get_names()
+
+# Self-signed certificate — disable TLS verification
+with AccordionQ2Client("https://device.local:5001", verify=False) as client:
+    names = client.resources.get_names()
+
+# Custom header (e.g. API key)
+with AccordionQ2Client("http://device.local:5000",
+                       default_headers={"X-Api-Key": "my-key"}) as client:
+    names = client.resources.get_names()
 ```
 
 ## Checking the Connection

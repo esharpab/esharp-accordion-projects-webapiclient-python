@@ -1,18 +1,20 @@
 """Raw bus transaction operations (I2C, UART, SPI, Socket)."""
 
+from __future__ import annotations
+
 from ._base import ApiGroupBase
 from .enums import BusActions
 from .models import BusTransactionResponse
 
 
-def _to_hex(data):
+def _to_hex(data: bytes | None) -> str | None:
     """Encode a bytes-like object as an uppercase hex string for JSON transport."""
     if data is None:
         return None
     return bytes(data).hex().upper()
 
 
-def _action_value(action):
+def _action_value(action: BusActions | str) -> str:
     """Return the JSON string for a BusActions value or plain string."""
     if isinstance(action, BusActions):
         return action.value
@@ -61,8 +63,15 @@ class CommGroup(ApiGroupBase):
                                   number_of_bytes_to_receive=64)
     """
 
-    def i2c(self, device_name, address, action, data_to_send=None,
-            number_of_bytes_to_receive=0, max_retries=-1):
+    def i2c(
+        self,
+        device_name: str,
+        address: int,
+        action: BusActions | str,
+        data_to_send: bytes | None = None,
+        number_of_bytes_to_receive: int = 0,
+        max_retries: int = -1,
+    ) -> BusTransactionResponse:
         """Perform an I2C bus transaction.
 
         Args:
@@ -76,7 +85,7 @@ class CommGroup(ApiGroupBase):
         Returns:
             :class:`~accordionq2.models.BusTransactionResponse`
         """
-        body = {
+        body: dict = {
             "DeviceName": device_name,
             "Address": format(address, "02X"),
             "Action": _action_value(action),
@@ -86,10 +95,18 @@ class CommGroup(ApiGroupBase):
         encoded = _to_hex(data_to_send)
         if encoded is not None:
             body["DataToSend"] = encoded
-        return BusTransactionResponse.from_dict(self._post_json("api/comm/i2c", body))
+        result = self._post_json("api/comm/i2c", body)
+        assert isinstance(result, dict)
+        return BusTransactionResponse.from_dict(result)
 
-    def uart(self, device_name, action, data_to_send=None,
-             number_of_bytes_to_receive=0, timeout_ms=1000):
+    def uart(
+        self,
+        device_name: str,
+        action: BusActions | str,
+        data_to_send: bytes | None = None,
+        number_of_bytes_to_receive: int = 0,
+        timeout_ms: int = 1000,
+    ) -> BusTransactionResponse:
         """Perform a UART bus transaction.
 
         Args:
@@ -102,7 +119,7 @@ class CommGroup(ApiGroupBase):
         Returns:
             :class:`~accordionq2.models.BusTransactionResponse`
         """
-        body = {
+        body: dict = {
             "DeviceName": device_name,
             "Action": _action_value(action),
             "NumberOfBytesToReceive": number_of_bytes_to_receive,
@@ -111,10 +128,17 @@ class CommGroup(ApiGroupBase):
         encoded = _to_hex(data_to_send)
         if encoded is not None:
             body["DataToSend"] = encoded
-        return BusTransactionResponse.from_dict(self._post_json("api/comm/uart", body))
+        result = self._post_json("api/comm/uart", body)
+        assert isinstance(result, dict)
+        return BusTransactionResponse.from_dict(result)
 
-    def spi(self, device_name, action, data_to_send=None,
-            number_of_bytes_to_receive=0):
+    def spi(
+        self,
+        device_name: str,
+        action: BusActions | str,
+        data_to_send: bytes | None = None,
+        number_of_bytes_to_receive: int = 0,
+    ) -> BusTransactionResponse:
         """Perform a SPI bus transaction.
 
         Args:
@@ -126,7 +150,7 @@ class CommGroup(ApiGroupBase):
         Returns:
             :class:`~accordionq2.models.BusTransactionResponse`
         """
-        body = {
+        body: dict = {
             "DeviceName": device_name,
             "Action": _action_value(action),
             "NumberOfBytesToReceive": number_of_bytes_to_receive,
@@ -134,11 +158,22 @@ class CommGroup(ApiGroupBase):
         encoded = _to_hex(data_to_send)
         if encoded is not None:
             body["DataToSend"] = encoded
-        return BusTransactionResponse.from_dict(self._post_json("api/comm/spi", body))
+        result = self._post_json("api/comm/spi", body)
+        assert isinstance(result, dict)
+        return BusTransactionResponse.from_dict(result)
 
-    def socket(self, device_name, action, host_name="", port=0,
-               data_to_send=None, number_of_bytes_to_receive=0,
-               termination_byte=0, use_termination_byte=False, timeout_ms=1000):
+    def socket(
+        self,
+        device_name: str,
+        action: BusActions | str,
+        host_name: str = "",
+        port: int = 0,
+        data_to_send: bytes | None = None,
+        number_of_bytes_to_receive: int = 0,
+        termination_byte: int = 0,
+        use_termination_byte: bool = False,
+        timeout_ms: int = 1000,
+    ) -> BusTransactionResponse:
         """Perform a Socket (TCP/IP) bus transaction.
 
         Args:
@@ -155,7 +190,7 @@ class CommGroup(ApiGroupBase):
         Returns:
             :class:`~accordionq2.models.BusTransactionResponse`
         """
-        body = {
+        body: dict = {
             "DeviceName": device_name,
             "Action": _action_value(action),
             "HostName": host_name,
@@ -168,4 +203,6 @@ class CommGroup(ApiGroupBase):
         encoded = _to_hex(data_to_send)
         if encoded is not None:
             body["DataToSend"] = encoded
-        return BusTransactionResponse.from_dict(self._post_json("api/comm/socket", body))
+        result = self._post_json("api/comm/socket", body)
+        assert isinstance(result, dict)
+        return BusTransactionResponse.from_dict(result)

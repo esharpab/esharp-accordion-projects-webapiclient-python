@@ -1,10 +1,12 @@
 """Data models for the AccordionQ2 REST API."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 from .enums import (
     AppTypes,
-    BusActions,
+    BusActions,  # noqa: F401 – re-exported for convenience
     ChannelTypes,
     DirectionTypes,
     MpioUsageTypes,
@@ -14,40 +16,32 @@ from .enums import (
 )
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ConnectionStatusDto:
     """Current connection status of the API to the hardware manager."""
-    is_connected = False
-    last_error = None
 
-    def __init__(self, is_connected=False, last_error=None):
-        self.is_connected = is_connected
-        self.last_error = last_error
+    is_connected: bool = False
+    last_error: str | None = None
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict) -> ConnectionStatusDto:
         return cls(
             is_connected=data.get("isConnected", False),
             last_error=data.get("lastError"),
         )
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class AppLicenseDto:
     """Application license information."""
-    name = ""
-    key = ""
-    expires = ""
-    type = AppTypes.UNKNOWN
 
-    def __init__(self, name="", key="", expires="", type=AppTypes.UNKNOWN):
-        self.name = name
-        self.key = key
-        self.expires = expires
-        self.type = type
+    name: str = ""
+    key: str = ""
+    expires: str = ""
+    type: AppTypes = AppTypes.UNKNOWN
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict) -> AppLicenseDto:
         raw_type = data.get("type", "Unknown")
         try:
             app_type = AppTypes(raw_type)
@@ -61,29 +55,20 @@ class AppLicenseDto:
         )
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ModuleSettingsDto:
     """Configuration settings for a hardware or software module."""
-    name = ""
-    enabled = False
-    class_name = ""
-    assembly_path = ""
-    namespace = ""
-    image_name = ""
-    initial_data = None
 
-    def __init__(self, name="", enabled=False, class_name="", assembly_path="",
-                 namespace="", image_name="", initial_data=None):
-        self.name = name
-        self.enabled = enabled
-        self.class_name = class_name
-        self.assembly_path = assembly_path
-        self.namespace = namespace
-        self.image_name = image_name
-        self.initial_data = initial_data if initial_data is not None else {}
+    name: str = ""
+    enabled: bool = False
+    class_name: str = ""
+    assembly_path: str = ""
+    namespace: str = ""
+    image_name: str = ""
+    initial_data: dict = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict) -> ModuleSettingsDto:
         return cls(
             name=data.get("name", ""),
             enabled=data.get("enabled", False),
@@ -94,7 +79,7 @@ class ModuleSettingsDto:
             initial_data=data.get("initialData") or {},
         )
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
             "Name": self.name,
             "Enabled": self.enabled,
@@ -106,24 +91,18 @@ class ModuleSettingsDto:
         }
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class PhysicalModuleDto:
     """Describes one physical hardware module slot."""
-    index = 0
-    name = ""
-    product_id = ""
-    revision = 0
-    serial_number = ""
 
-    def __init__(self, index=0, name="", product_id="", revision=0, serial_number=""):
-        self.index = index
-        self.name = name
-        self.product_id = product_id
-        self.revision = revision
-        self.serial_number = serial_number
+    index: int = 0
+    name: str = ""
+    product_id: str = ""
+    revision: int = 0
+    serial_number: str = ""
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict) -> PhysicalModuleDto:
         return cls(
             index=data.get("index", 0),
             name=data.get("name", ""),
@@ -133,29 +112,20 @@ class PhysicalModuleDto:
         )
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class PhysicalSystemDto:
     """Physical hardware system description (topology)."""
-    host = ""
-    eth_ip_v4 = ""
-    eth_ip_v6 = ""
-    firmware = ""
-    mac = ""
-    modules = None
-    network_interfaces = None
 
-    def __init__(self, host="", eth_ip_v4="", eth_ip_v6="", firmware="",
-                 mac="", modules=None, network_interfaces=None):
-        self.host = host
-        self.eth_ip_v4 = eth_ip_v4
-        self.eth_ip_v6 = eth_ip_v6
-        self.firmware = firmware
-        self.mac = mac
-        self.modules = modules if modules is not None else []
-        self.network_interfaces = network_interfaces if network_interfaces is not None else {}
+    host: str = ""
+    eth_ip_v4: str = ""
+    eth_ip_v6: str = ""
+    firmware: str = ""
+    mac: str = ""
+    modules: tuple[PhysicalModuleDto, ...] = field(default_factory=tuple)
+    network_interfaces: dict = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict) -> PhysicalSystemDto:
         modules_data = data.get("modules") or []
         return cls(
             host=data.get("host", ""),
@@ -163,61 +133,35 @@ class PhysicalSystemDto:
             eth_ip_v6=data.get("ethIpV6", ""),
             firmware=data.get("firmware", ""),
             mac=data.get("mac", ""),
-            modules=[PhysicalModuleDto.from_dict(m) for m in modules_data],
+            modules=tuple(PhysicalModuleDto.from_dict(m) for m in modules_data),
             network_interfaces=data.get("networkInterfaces") or {},
         )
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ChannelDto:
     """Represents a multi-purpose hardware channel."""
-    channel_index = 0
-    index = 0
-    enabled = False
-    usage = MpioUsageTypes.UNDEFINED
-    device_name = ""
-    channel_type = ChannelTypes.UNDEFINED
-    channel_type_capability = ChannelTypes.UNDEFINED
-    alias = ""
-    net_name = ""
-    group_name = ""
-    capability = DirectionTypes.UNDEFINED
-    description = ""
-    direction = DirectionTypes.UNDEFINED
-    direction_changed = False
-    default_direction = DirectionTypes.UNDEFINED
-    unit = ""
-    is_virtual = False
 
-    def __init__(self, channel_index=0, index=0, enabled=False,
-                 usage=MpioUsageTypes.UNDEFINED, device_name="",
-                 channel_type=ChannelTypes.UNDEFINED,
-                 channel_type_capability=ChannelTypes.UNDEFINED,
-                 alias="", net_name="", group_name="",
-                 capability=DirectionTypes.UNDEFINED, description="",
-                 direction=DirectionTypes.UNDEFINED, direction_changed=False,
-                 default_direction=DirectionTypes.UNDEFINED, unit="",
-                 is_virtual=False):
-        self.channel_index = channel_index
-        self.index = index
-        self.enabled = enabled
-        self.usage = usage
-        self.device_name = device_name
-        self.channel_type = channel_type
-        self.channel_type_capability = channel_type_capability
-        self.alias = alias
-        self.net_name = net_name
-        self.group_name = group_name
-        self.capability = capability
-        self.description = description
-        self.direction = direction
-        self.direction_changed = direction_changed
-        self.default_direction = default_direction
-        self.unit = unit
-        self.is_virtual = is_virtual
+    channel_index: int = 0
+    index: int = 0
+    enabled: bool = False
+    usage: MpioUsageTypes = MpioUsageTypes.UNDEFINED
+    device_name: str = ""
+    channel_type: ChannelTypes = ChannelTypes.UNDEFINED
+    channel_type_capability: ChannelTypes = ChannelTypes.UNDEFINED
+    alias: str = ""
+    net_name: str = ""
+    group_name: str = ""
+    capability: DirectionTypes = DirectionTypes.UNDEFINED
+    description: str = ""
+    direction: DirectionTypes = DirectionTypes.UNDEFINED
+    direction_changed: bool = False
+    default_direction: DirectionTypes = DirectionTypes.UNDEFINED
+    unit: str = ""
+    is_virtual: bool = False
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict) -> ChannelDto:
         raw_usage = data.get("usage", "Undefined")
         try:
             usage = MpioUsageTypes(raw_usage)
@@ -244,15 +188,15 @@ class ChannelDto:
         )
 
 
+@dataclass(slots=True)
 class ChannelLookupRequest:
     """Identifies a channel by alias or net name."""
 
-    def __init__(self, alias=None, net_name=None):
-        self.alias = alias
-        self.net_name = net_name
+    alias: str | None = None
+    net_name: str | None = None
 
-    def to_dict(self):
-        result = {}
+    def to_dict(self) -> dict:
+        result: dict = {}
         if self.alias is not None:
             result["Alias"] = self.alias
         if self.net_name is not None:
@@ -260,25 +204,24 @@ class ChannelLookupRequest:
         return result
 
 
+@dataclass(slots=True)
 class ChannelConfigRequest:
     """Partial-update configuration for a single channel.
 
     Only non-None fields are applied; the rest are left unchanged.
     """
 
-    def __init__(self, alias=None, net_name=None, enabled=None, direction=None,
-                 description=None, unit=None, group_name=None, device_name=None):
-        self.alias = alias
-        self.net_name = net_name
-        self.enabled = enabled
-        self.direction = direction
-        self.description = description
-        self.unit = unit
-        self.group_name = group_name
-        self.device_name = device_name
+    alias: str | None = None
+    net_name: str | None = None
+    enabled: bool | None = None
+    direction: DirectionTypes | None = None
+    description: str | None = None
+    unit: str | None = None
+    group_name: str | None = None
+    device_name: str | None = None
 
-    def to_dict(self):
-        result = {}
+    def to_dict(self) -> dict:
+        result: dict = {}
         if self.alias is not None:
             result["Alias"] = self.alias
         if self.net_name is not None:
@@ -298,7 +241,7 @@ class ChannelConfigRequest:
         return result
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class BusTransactionResponse:
     """Result of a raw bus transaction (I2C, UART, SPI, or Socket)."""
 
@@ -308,7 +251,7 @@ class BusTransactionResponse:
     number_of_bytes_received: int = 0
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict) -> BusTransactionResponse:
         raw = data.get("received") or ""
         try:
             received = bytes.fromhex(raw) if raw else b""
@@ -322,28 +265,28 @@ class BusTransactionResponse:
         )
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class NumericResultChannelDto:
     """Describes one NumericResult channel and its sampling capabilities."""
 
     net_name: str = ""
     alias: str = ""
-    possible_target_names: list = field(default_factory=list)
+    possible_target_names: tuple[str, ...] = field(default_factory=tuple)
     sample_rate: int = 0
     default_samples: int = 0
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict) -> NumericResultChannelDto:
         return cls(
             net_name=data.get("netName", ""),
             alias=data.get("alias", ""),
-            possible_target_names=data.get("possibleTargetNames") or [],
+            possible_target_names=tuple(data.get("possibleTargetNames") or []),
             sample_rate=data.get("sampleRate", 0),
             default_samples=data.get("defaultSamples", 0),
         )
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class NumericMeasureResultDto:
     """Acquisition metadata returned after a successful measure call."""
 
@@ -357,7 +300,7 @@ class NumericMeasureResultDto:
     duration: str = ""
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict) -> NumericMeasureResultDto:
         return cls(
             channel_net_name=data.get("channelNetName", ""),
             target_net_name=data.get("targetNetName", ""),

@@ -4,6 +4,10 @@ All models live in `accordionq2.models`.
 
 Response models provide a `from_dict(data)` class method for deserialization; request models provide a `to_dict()` instance method for serialization.
 
+> **Immutability:** All response models are decorated with `@dataclass(frozen=True, slots=True)`.
+> Fields cannot be modified after construction — create a new instance if you need a different value.
+> Request models (`ChannelLookupRequest`, `ChannelConfigRequest`, `ModuleSettingsDto`) are mutable.
+
 ## Response Models
 
 ### `ConnectionStatusDto`
@@ -11,23 +15,29 @@ Response models provide a `from_dict(data)` class method for deserialization; re
 | Field | Type | Description |
 |-------|------|-------------|
 | `is_connected` | `bool` | `True` if the API is connected to the hardware manager |
-| `last_error` | `str` or `None` | Last error message, if any |
+| `last_error` | `str \| None` | Last error message, if any |
 
 ### `ChannelDto`
 
-Full channel description with 18 fields including type, direction, alias, unit, and more.
-
 | Field | Type | Description |
 |-------|------|-------------|
-| `net_name` | `str` | Unique net name |
-| `alias` | `str` | Human-readable alias |
-| `channel_type` | `ChannelTypes` | Channel type flags |
-| `direction` | `DirectionTypes` | Direction flags (IN, OUT) |
+| `channel_index` | `int` | Physical channel index |
+| `index` | `int` | Logical index |
 | `enabled` | `bool` | Whether the channel is enabled |
-| `value` | `str` | Current value |
-| `unit` | `str` | Unit of measurement |
-| `description` | `str` | Human-readable description |
+| `usage` | `MpioUsageTypes` | Usage classification |
+| `device_name` | `str` | Name of the providing device |
+| `channel_type` | `ChannelTypes` | Active channel type flags |
+| `channel_type_capability` | `ChannelTypes` | Supported type flags (hardware capability) |
+| `alias` | `str` | Human-readable alias |
+| `net_name` | `str` | Unique net name |
 | `group_name` | `str` | Logical group name |
+| `capability` | `DirectionTypes` | Supported direction capability |
+| `description` | `str` | Human-readable description |
+| `direction` | `DirectionTypes` | Current direction (IN, OUT) |
+| `direction_changed` | `bool` | Whether direction was changed from default |
+| `default_direction` | `DirectionTypes` | Factory-default direction |
+| `unit` | `str` | Unit of measurement |
+| `is_virtual` | `bool` | Whether this is a virtual channel |
 | `device_name` | `str` | Name of the providing device |
 | `usage_type` | `MpioUsageTypes` | Usage classification |
 | ... | ... | Additional fields |
@@ -39,7 +49,10 @@ Full channel description with 18 fields including type, direction, alias, unit, 
 | `name` | `str` | Module name |
 | `enabled` | `bool` | Whether the module is enabled |
 | `class_name` | `str` | Module class name |
-| `initial_data` | `str` | Initial configuration data |
+| `assembly_path` | `str` | Path to the module assembly |
+| `namespace` | `str` | Module namespace |
+| `image_name` | `str` | Docker / image name |
+| `initial_data` | `dict` | Initial configuration data |
 
 ### `PhysicalSystemDto`
 
@@ -48,7 +61,10 @@ Full channel description with 18 fields including type, direction, alias, unit, 
 | `host` | `str` | Host name |
 | `mac` | `str` | MAC address |
 | `firmware` | `str` | Firmware version |
-| `modules` | `list[PhysicalModuleDto]` | List of hardware modules |
+| `eth_ip_v4` | `str` | IPv4 address |
+| `eth_ip_v6` | `str` | IPv6 address |
+| `modules` | `tuple[PhysicalModuleDto, ...]` | Hardware modules (immutable) |
+| `network_interfaces` | `dict` | All network interfaces |
 
 ### `PhysicalModuleDto`
 
@@ -57,7 +73,7 @@ Full channel description with 18 fields including type, direction, alias, unit, 
 | `index` | `int` | Slot index |
 | `name` | `str` | Module name |
 | `product_id` | `str` | Product identifier |
-| `revision` | `str` | Hardware revision |
+| `revision` | `int` | Hardware revision |
 | `serial_number` | `str` | Serial number |
 
 ### `AppLicenseDto`
@@ -84,7 +100,7 @@ Full channel description with 18 fields including type, direction, alias, unit, 
 |-------|------|-------------|
 | `net_name` | `str` | Net name of the NumericResult channel |
 | `alias` | `str` | Alias of the channel |
-| `possible_target_names` | `list[str]` | Physical channels this channel can sample |
+| `possible_target_names` | `tuple[str, ...]` | Physical channels this channel can sample (immutable) |
 | `sample_rate` | `int` | Sampling rate in Hz |
 | `default_samples` | `int` | Default number of samples |
 

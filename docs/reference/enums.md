@@ -78,6 +78,44 @@ Hardware channel type flags. Type: `IntFlag`.
 | Value | Bit | Description |
 |-------|-----|-------------|
 | `UNDEFINED` | 0 | Not defined |
+| `ANALOG` | 1 | Analog (voltage/current) channel |
+| `DIGITAL` | 2 | Digital I/O channel |
+| `VIRTUAL_DIGITAL` | 4 | Software-defined digital channel |
+| `TEMPERATURE` | 8 | Temperature sensor channel |
+| `MULTIPLEXER` | 16 | Multiplexer channel |
+| `RESISTANCE` | 32 | Resistance measurement channel |
+| `COUNTER` | 64 | Pulse counter channel |
+| `FREQUENCY` | 128 | Frequency measurement channel |
+| `ACTUATOR` | 256 | Actuator output channel |
+| `REGISTER` | 1024 | Register/memory-mapped channel |
+| `CURRENT` | 2048 | Current measurement channel |
+| `RATIOMETRIC` | 4096 | Ratiometric measurement channel |
+| `UART` | 8192 | UART serial channel |
+| `SPI` | 16384 | SPI bus channel |
+| `I2C` | 32768 | I2C bus channel |
+| `BYTE_STREAM` | 65536 | Raw byte stream channel |
+| `SOCKET` | 131072 | TCP socket channel |
+| `WAVEFORM` | 262144 | Waveform generation/capture channel |
+| `NUMERIC_RESULT` | 524288 | Single numeric result channel |
+| `PSEUDO_DIGITAL` | 1048576 | Pseudo-digital (thresholded analog) channel |
+| `IMAGE` | 2097152 | Image capture channel |
+| `AUDIO` | 4194304 | Audio channel |
+| `VIDEO` | 8388608 | Video channel |
+| `INSTRUMENT` | 16777216 | Virtual instrument channel |
+| `NUMERIC_RESULTS` | 33554432 | Multi-sample numeric results channel |
+| `CALIBRATION` | 67108864 | Calibration channel |
+
+Supports bitwise operations:
+
+```python
+from accordionq2.enums import ChannelTypes
+
+if ch.channel_type & ChannelTypes.ANALOG:
+    print("Analog channel")
+
+if ch.channel_type & (ChannelTypes.I2C | ChannelTypes.SPI):
+    print("Bus channel")
+```
 | `ANALOG` | 1 | Analog channel |
 | `DIGITAL` | 2 | Digital channel |
 | `VIRTUAL_DIGITAL` | 4 | Virtual digital channel |

@@ -1,10 +1,13 @@
 """Enumerations mirroring the AccordionQ2 hardware type definitions."""
 
+from __future__ import annotations
+
 from enum import Enum, IntFlag
 
 
 class ModuleStatus(str, Enum):
     """Application module status."""
+
     UNKNOWN = "Unknown"
     OK = "OK"
     WARNING = "Warning"
@@ -14,6 +17,7 @@ class ModuleStatus(str, Enum):
 
 class AppTypes(str, Enum):
     """Application/module type classification."""
+
     UNKNOWN = "Unknown"
     SOFTWARE_MODULE = "SoftwareModule"
     HARDWARE_MODULE = "HardwareModule"
@@ -21,6 +25,7 @@ class AppTypes(str, Enum):
 
 class DirectionTypes(IntFlag):
     """I/O direction flags for channels."""
+
     UNDEFINED = 0
     IN = 1
     OUT = 2
@@ -28,6 +33,7 @@ class DirectionTypes(IntFlag):
 
 class MpioUsageTypes(str, Enum):
     """Multi-purpose I/O usage classification."""
+
     UNDEFINED = "Undefined"
     HIDDEN_SYSTEM_CONTROL = "HiddenSystemControl"
     READ_ONLY_SYSTEM_CONTROL = "ReadOnlySystemControl"
@@ -37,18 +43,20 @@ class MpioUsageTypes(str, Enum):
 
 class BusActions(str, Enum):
     """Bus transaction action, mirroring ``BusTransactionTypes.BusActions``."""
-    UNDEFINED     = "Undefined"
-    SEND          = "Send"
-    RECEIVE       = "Receive"
-    SEND_RECEIVE  = "SendReceive"
-    SCAN          = "Scan"
-    BREAK         = "Break"
+
+    UNDEFINED = "Undefined"
+    SEND = "Send"
+    RECEIVE = "Receive"
+    SEND_RECEIVE = "SendReceive"
+    SCAN = "Scan"
+    BREAK = "Break"
     CLEAR_BUFFERS = "ClearBuffers"
-    RECONFIGURE   = "Reconfigure"
+    RECONFIGURE = "Reconfigure"
 
 
 class ChannelTypes(IntFlag):
     """Hardware channel type flags."""
+
     UNDEFINED = 0
     ANALOG = 1 << 0
     DIGITAL = 1 << 1
@@ -78,75 +86,72 @@ class ChannelTypes(IntFlag):
     CALIBRATION = 1 << 26
 
 
-# --- JSON parsing helpers for IntFlag enums ---
+# --- JSON name → integer value mappings derived from the enum members ---
+# Keys match the PascalCase names used in the REST API JSON payloads.
+# Keeping these explicit (rather than auto-generating from member names) lets
+# us handle the handful of cases where the JSON name differs from the Python
+# attribute name (e.g. "UART" → ChannelTypes.UART, "I2C" → ChannelTypes.I2C).
 
-_DIRECTION_NAMES = {
-    "Undefined": 0, "IN": 1, "OUT": 2,
-}
-
-_CHANNEL_TYPE_NAMES = {
+_DIRECTION_JSON: dict[str, int] = {
     "Undefined": 0,
-    "Analog": 1 << 0,
-    "Digital": 1 << 1,
-    "VirtualDigital": 1 << 2,
-    "Temperature": 1 << 3,
-    "Multiplexer": 1 << 4,
-    "Resistance": 1 << 5,
-    "Counter": 1 << 6,
-    "Frequency": 1 << 7,
-    "Actuator": 1 << 8,
-    "Register": 1 << 10,
-    "Current": 1 << 11,
-    "Ratiometric": 1 << 12,
-    "UART": 1 << 13,
-    "SPI": 1 << 14,
-    "I2C": 1 << 15,
-    "ByteStream": 1 << 16,
-    "Socket": 1 << 17,
-    "Waveform": 1 << 18,
-    "NumericResult": 1 << 19,
-    "PseudoDigital": 1 << 20,
-    "Image": 1 << 21,
-    "Audio": 1 << 22,
-    "Video": 1 << 23,
-    "Instrument": 1 << 24,
-    "NumericResults": 1 << 25,
-    "Calibration": 1 << 26,
+    "IN": DirectionTypes.IN,
+    "OUT": DirectionTypes.OUT,
 }
 
+_CHANNEL_TYPE_JSON: dict[str, int] = {
+    "Undefined": 0,
+    "Analog": ChannelTypes.ANALOG,
+    "Digital": ChannelTypes.DIGITAL,
+    "VirtualDigital": ChannelTypes.VIRTUAL_DIGITAL,
+    "Temperature": ChannelTypes.TEMPERATURE,
+    "Multiplexer": ChannelTypes.MULTIPLEXER,
+    "Resistance": ChannelTypes.RESISTANCE,
+    "Counter": ChannelTypes.COUNTER,
+    "Frequency": ChannelTypes.FREQUENCY,
+    "Actuator": ChannelTypes.ACTUATOR,
+    "Register": ChannelTypes.REGISTER,
+    "Current": ChannelTypes.CURRENT,
+    "Ratiometric": ChannelTypes.RATIOMETRIC,
+    "UART": ChannelTypes.UART,
+    "SPI": ChannelTypes.SPI,
+    "I2C": ChannelTypes.I2C,
+    "ByteStream": ChannelTypes.BYTE_STREAM,
+    "Socket": ChannelTypes.SOCKET,
+    "Waveform": ChannelTypes.WAVEFORM,
+    "NumericResult": ChannelTypes.NUMERIC_RESULT,
+    "PseudoDigital": ChannelTypes.PSEUDO_DIGITAL,
+    "Image": ChannelTypes.IMAGE,
+    "Audio": ChannelTypes.AUDIO,
+    "Video": ChannelTypes.VIDEO,
+    "Instrument": ChannelTypes.INSTRUMENT,
+    "NumericResults": ChannelTypes.NUMERIC_RESULTS,
+    "Calibration": ChannelTypes.CALIBRATION,
+}
 
-def parse_direction_types(value):
+_DIRECTION_JSON_REV: dict[int, str] = {v: k for k, v in _DIRECTION_JSON.items() if v != 0}
+
+
+def parse_direction_types(value: int | str) -> DirectionTypes:
     """Parse a DirectionTypes value from JSON (integer or comma-separated string)."""
     if isinstance(value, int):
         return DirectionTypes(value)
-    if isinstance(value, str):
-        result = 0
-        for part in value.split(","):
-            result |= _DIRECTION_NAMES.get(part.strip(), 0)
-        return DirectionTypes(result)
-    return DirectionTypes.UNDEFINED
+    result = 0
+    for part in value.split(","):
+        result |= _DIRECTION_JSON.get(part.strip(), 0)
+    return DirectionTypes(result)
 
 
-def parse_channel_types(value):
+def parse_channel_types(value: int | str) -> ChannelTypes:
     """Parse a ChannelTypes value from JSON (integer or comma-separated string)."""
     if isinstance(value, int):
         return ChannelTypes(value)
-    if isinstance(value, str):
-        result = 0
-        for part in value.split(","):
-            result |= _CHANNEL_TYPE_NAMES.get(part.strip(), 0)
-        return ChannelTypes(result)
-    return ChannelTypes.UNDEFINED
+    result = 0
+    for part in value.split(","):
+        result |= _CHANNEL_TYPE_JSON.get(part.strip(), 0)
+    return ChannelTypes(result)
 
 
-_DIRECTION_NAMES_REV = {v: k for k, v in _DIRECTION_NAMES.items()}
-
-
-def direction_to_json(value):
+def direction_to_json(value: DirectionTypes) -> str:
     """Serialize a DirectionTypes value to a JSON-compatible string."""
-    parts = [
-        _DIRECTION_NAMES_REV[m.value]
-        for m in DirectionTypes
-        if m.value and m in value
-    ]
+    parts = [_DIRECTION_JSON_REV[m.value] for m in DirectionTypes if m.value and m in value]
     return ", ".join(parts) if parts else "Undefined"

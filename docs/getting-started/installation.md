@@ -22,14 +22,47 @@ Or install without editable mode:
 pip install .
 ```
 
+## Using uv (recommended for development)
+
+[uv](https://github.com/astral-sh/uv) is a fast Python package manager:
+
+```bash
+# Install uv
+pip install uv
+
+# Create a virtual environment and install the package
+uv venv
+uv pip install -e .
+```
+
+## Development Setup
+
+Install with all development dependencies (linting, type checking, tests):
+
+```bash
+pip install -e ".[dev]"
+```
+
+This installs:
+- **pytest** &mdash; test runner
+- **ruff** &mdash; linter and formatter
+- **mypy** &mdash; static type checker
+- **pre-commit** &mdash; git hook runner
+
+To activate pre-commit hooks:
+
+```bash
+pre-commit install
+```
+
 ## Requirements
 
 | Requirement | Details |
 |-------------|---------|
-| Python      | 3.8 or later |
-| Platform    | Windows, Linux (including ARM / Raspberry Pi) |
+| Python      | 3.11 or later |
+| Platform    | Windows, Linux (including ARM / Raspberry Pi), macOS |
 | Architecture | 32-bit and 64-bit |
-| Dependencies | **None** &mdash; standard library only (`urllib`, `json`, `enum`, `dataclasses`) |
+| Dependencies | **None** &mdash; standard library only (`http.client`, `json`, `ssl`, `threading`, `dataclasses`) |
 
 ## Verifying the Installation
 

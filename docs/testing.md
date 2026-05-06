@@ -1,6 +1,6 @@
 # Testing
 
-The test suite uses [pytest](https://docs.pytest.org/) and talks to a live AccordionQ2 device.
+The test suite uses [pytest](https://docs.pytest.org/) and is split into **unit tests** (no hardware required) and **integration tests** (require a live AccordionQ2 device).
 
 ## Setup
 
@@ -9,26 +9,34 @@ The test suite uses [pytest](https://docs.pytest.org/) and talks to a live Accor
 pip install -e ".[dev]"
 ```
 
-## Running Tests
+## Unit Tests
 
-### Integration Tests
+Unit tests run entirely offline using mocks. No hardware or network connection is needed.
+
+```bash
+pytest tests/unit/ -v
+```
+
+Expected output: all tests pass in under a second.
+
+## Integration Tests
 
 Integration tests require a live AccordionQ2 device on the network. The `ACCORDIONQ2_API_URL`
 environment variable **must** be set — there is no default:
 
 ```bash
-# Run all tests against a specific device
-ACCORDIONQ2_API_URL=http://mydevice.local:5000 pytest tests/ -v
+# Run all integration tests against a specific device
+ACCORDIONQ2_API_URL=http://mydevice.local:5000 pytest tests/ -m integration -v
 ```
 
 On Windows (PowerShell):
 
 ```powershell
 $env:ACCORDIONQ2_API_URL = "http://mydevice.local:5000"
-pytest tests/ -v
+pytest tests/ -m integration -v
 ```
 
-If `ACCORDIONQ2_API_URL` is not set, pytest will exit immediately with an error.
+If `ACCORDIONQ2_API_URL` is not set, integration tests are skipped automatically.
 
 ### Performance Tests
 
@@ -43,20 +51,34 @@ ACCORDIONQ2_API_URL=http://mydevice.local:5000 pytest tests/ -m performance -v
 | `integration` | Requires a live AccordionQ2 device |
 | `performance` | Performance/benchmarking tests |
 
+Tests without a marker are plain unit tests and run by default.
+
 ## Hardware-Specific Tests
 
-Some tests are automatically **skipped** when the connected hardware does not have the required
-modules or channels (e.g. ADC channels, LED tower). No manual configuration is needed — the
-test suite adapts to the target device at runtime.
+Some integration tests are automatically **skipped** when the connected hardware does not have the
+required modules or channels (e.g. ADC channels, LED tower). No manual configuration is needed —
+the test suite adapts to the target device at runtime.
 
-## Using the Publish Script
+## Continuous Integration
 
-The included PowerShell publish script can also run tests:
+The CI pipeline (`.github/workflows/ci.yml`) runs automatically on every push and pull request:
 
-```powershell
-# Run tests (integration + unit)
-.\publish-python-package.ps1 -Action Test
+| Job | Description |
+|-----|-------------|
+| `lint` | Runs `ruff check` and `ruff format --check` |
+| `typecheck` | Runs `mypy --strict` on the `accordionq2` package |
+| `test` | Runs unit tests on Ubuntu, Windows, and macOS × Python 3.11, 3.12, 3.13 |
 
-# Full pipeline: setup, test, build
-.\publish-python-package.ps1 -Action All
+Integration tests are **not** run in CI (no hardware available).
+
+## Pre-commit Hooks
+
+Pre-commit hooks run ruff and mypy automatically before each commit:
+
+```bash
+# Install hooks (one-time setup)
+pre-commit install
+
+# Run manually against all files
+pre-commit run --all-files
 ```

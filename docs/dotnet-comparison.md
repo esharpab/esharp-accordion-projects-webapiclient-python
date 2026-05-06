@@ -13,6 +13,7 @@ Both the Python and .NET clients expose the same API surface with idiomatic nami
 | Config | `ChannelConfigRequest.Enabled = true` | `ChannelConfigRequest(enabled=True)` |
 | Enums | `ChannelTypes.Analog` | `ChannelTypes.ANALOG` |
 | Errors | `AccordionQ2ApiException` | `AccordionQ2ApiError` |
+| Type annotations | Full (Nullable Reference Types) | Full (PEP 484, mypy strict) |
 | Dependencies | Newtonsoft.Json | None (stdlib only) |
 | Install | `dotnet add package AccordionQ2.WebApiClient` | `pip install accordionq2` |
 | Package | [NuGet](https://www.nuget.org/packages/AccordionQ2.WebApiClient/) | [PyPI](https://pypi.org/project/accordionq2/) |

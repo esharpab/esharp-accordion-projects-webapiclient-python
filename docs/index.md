@@ -9,11 +9,13 @@ This is the Python counterpart of the [.NET WebApiClient](https://www.nuget.org/
 
 ## Features
 
-- **Zero dependencies** &mdash; uses only the Python standard library (`urllib`, `json`, `dataclasses`)
+- **Zero dependencies** &mdash; uses only the Python standard library (`http.client`, `json`, `ssl`, `threading`, `dataclasses`)
 - **Full API coverage** &mdash; 8 operation groups covering all hardware management endpoints
 - **Synchronous & thread-safe** &mdash; simple blocking calls, safe from multiple threads
 - **Context manager support** &mdash; use with `with` blocks for clean resource management
-- **Cross-platform** &mdash; Windows, Linux (including ARM / Raspberry Pi)
+- **Cross-platform** &mdash; Windows, Linux (including ARM / Raspberry Pi), macOS
+- **Fully typed** &mdash; complete PEP 484 type annotations, compatible with mypy strict mode
+- **Immutable models** &mdash; all response DTOs are frozen dataclasses
 
 ## Quick Example
 

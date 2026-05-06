@@ -1,6 +1,6 @@
 # API Overview
 
-`AccordionQ2Client` exposes **eight operation groups**, each covering one area of the hardware API. All methods are **synchronous** and raise `AccordionQ2ApiError` on HTTP errors.
+`AccordionQ2Client` exposes **eight operation groups**, each covering one area of the hardware API. All methods are **synchronous**, **thread-safe**, and raise `AccordionQ2ApiError` on HTTP errors. The entire library is fully annotated with PEP 484 type hints and passes `mypy --strict`.
 
 ```python
 from accordionq2 import AccordionQ2Client

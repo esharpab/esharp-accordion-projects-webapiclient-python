@@ -64,13 +64,28 @@ client.close()
 ### Constructor
 
 ```python
-AccordionQ2Client(base_url, timeout=30.0)
+AccordionQ2Client(base_url, timeout=30.0, auth=None, verify=True, default_headers=None)
 ```
 
-| Parameter  | Description |
-|------------|-------------|
-| `base_url` | Base URL of the AccordionQ2 WebApi, e.g. `"http://raspberrypi:5000"` |
-| `timeout`  | HTTP request timeout in seconds (default **30**) |
+| Parameter         | Type                    | Default | Description |
+|-------------------|-------------------------|---------|-------------|
+| `base_url`        | `str`                   | —       | Base URL of the AccordionQ2 WebApi, e.g. `"http://raspberrypi:5000"` |
+| `timeout`         | `float`                 | `30.0`  | HTTP request timeout in seconds |
+| `auth`            | `tuple[str, str] \| None` | `None`  | Optional `(username, password)` for HTTP Basic Auth |
+| `verify`          | `bool \| str`           | `True`  | TLS certificate verification. `False` disables (useful for self-signed certs). A string is treated as a path to a CA bundle. |
+| `default_headers` | `dict[str, str] \| None` | `None`  | Additional headers merged into every request (e.g. `{"X-Api-Key": "secret"}`) |
+
+```python
+# HTTP Basic Auth
+client = AccordionQ2Client("https://device.local:5001", auth=("admin", "secret"))
+
+# Self-signed certificate — disable TLS verification
+client = AccordionQ2Client("https://device.local:5001", verify=False)
+
+# API key header
+client = AccordionQ2Client("http://device.local:5000",
+                           default_headers={"X-Api-Key": "my-api-key"})
+```
 
 ---
 
@@ -362,7 +377,7 @@ All models live in `accordionq2.models`.
 | `ChannelConfigRequest` | Partial-update request &mdash; only non-`None` fields are applied |
 | `ChannelLookupRequest` | Identify a channel by `alias` or `net_name` |
 | `ModuleSettingsDto` | Module configuration (`name`, `enabled`, `class_name`, `initial_data`, etc.) |
-| `PhysicalSystemDto` | Hardware topology (`host`, `mac`, `firmware`, `modules` list) |
+| `PhysicalSystemDto` | Hardware topology (`host`, `mac`, `firmware`, `modules` tuple) |
 | `PhysicalModuleDto` | One hardware slot (`index`, `name`, `product_id`, `revision`, `serial_number`) |
 | `AppLicenseDto` | License info (`name`, `key`, `expires`, `type`) |
 | `BusTransactionResponse` | `device_name`, `action`, `received` (bytes), `number_of_bytes_received` |
@@ -371,6 +386,10 @@ All models live in `accordionq2.models`.
 
 Response models provide a `from_dict(data)` class method; request models
 provide a `to_dict()` instance method.
+
+All response models are **immutable** (`frozen=True`) — fields cannot be
+modified after construction. Create a new instance if you need a different
+value.
 
 ## Enumerations
 
@@ -417,23 +436,36 @@ except AccordionQ2ApiError as e:
 
 ---
 
-## Running the Integration Tests
+## Running the Tests
 
-The test suite uses [pytest](https://docs.pytest.org/) and talks to a live
-AccordionQ2 device.
+The test suite uses [pytest](https://docs.pytest.org/).
 
 ```bash
 # Install with test dependencies
 pip install -e ".[dev]"
-
-# Run all integration tests
-pytest tests/ -m integration -v
-
-# Override the default device URL
-ACCORDIONQ2_API_URL=http://mydevice:5000 pytest tests/ -m integration
 ```
 
-The default URL is `http://agent64.local:5000`.
+### Unit Tests (no hardware required)
+
+```bash
+pytest tests/unit/ -v
+```
+
+Unit tests use mocks and run entirely offline.
+
+### Integration Tests (live device required)
+
+```bash
+# Requires a live AccordionQ2 device
+ACCORDIONQ2_API_URL=http://mydevice:5000 pytest tests/ -m integration -v
+```
+
+On Windows (PowerShell):
+
+```powershell
+$env:ACCORDIONQ2_API_URL = "http://mydevice.local:5000"
+pytest tests/ -m integration -v
+```
 
 ---
 

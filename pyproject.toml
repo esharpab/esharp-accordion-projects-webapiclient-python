@@ -1,16 +1,30 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "accordionq2"
-version = "1.2.0"
+version = "2.0.0"
 description = "Python client for the AccordionQ2 Hardware Management REST API"
 readme = "README.md"
-requires-python = ">=3.8"
-license = {text = "Proprietary"}
+requires-python = ">=3.11"
+license = {text = "LicenseRef-Proprietary", file = "LICENSE.md"}
 authors = [{name = "eSharp AB"}]
 dependencies = []
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "License :: Other/Proprietary License",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Hardware",
+]
 
 [project.urls]
 Homepage = "https://github.com/esharpab/esharp-accordion-projects-webapiclient-python"
@@ -19,11 +33,48 @@ PyPI = "https://pypi.org/project/accordionq2/"
 "NuGet (.NET)" = "https://www.nuget.org/packages/AccordionQ2.WebApiClient/"
 
 [project.optional-dependencies]
-dev = ["pytest>=7"]
+dev = [
+    "pytest>=8",
+    "ruff>=0.9",
+    "mypy>=1.13",
+    "pre-commit>=4",
+]
 docs = ["mkdocs-material>=9.0"]
 
 [tool.setuptools.packages.find]
 include = ["accordionq2*"]
 
 [tool.pytest.ini_options]
-markers = ["integration: marks tests as integration tests (require hardware)", "performance: marks throughput/latency benchmarks (require hardware)"]
+addopts = "-m 'not integration and not performance'"
+markers = [
+    "integration: marks tests as integration tests (require hardware)",
+    "performance: marks throughput/latency benchmarks (require hardware)",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "RUF",  # ruff-specific (includes RUF012 – mutable class vars)
+    "ANN",  # flake8-annotations (type hint enforcement)
+]
+ignore = [
+    "ANN101",  # missing type for `self`
+    "ANN102",  # missing type for `cls`
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN"]  # no annotation enforcement in tests
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["accordionq2"]

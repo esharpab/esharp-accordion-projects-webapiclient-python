@@ -1,12 +1,11 @@
 """Fast numeric sampling operations."""
 
+from __future__ import annotations
+
+from urllib.parse import quote as _quote
+
 from ._base import ApiGroupBase
 from .models import NumericMeasureResultDto, NumericResultChannelDto
-
-try:
-    from urllib.parse import quote as _quote
-except ImportError:
-    from urllib import quote as _quote  # Python 2 fallback (unused but safe)
 
 
 class NumericResultsGroup(ApiGroupBase):
@@ -29,15 +28,13 @@ class NumericResultsGroup(ApiGroupBase):
         stdev = client.numeric_results.get_stdev(channels[0].net_name)
     """
 
-    def get_channels(self):
-        """Return all NumericResult channels with their sampling capabilities.
-
-        Returns a list of :class:`~accordionq2.models.NumericResultChannelDto`.
-        """
+    def get_channels(self) -> list[NumericResultChannelDto]:
+        """Return all NumericResult channels with their sampling capabilities."""
         data = self._get_json("api/numeric-results/channels")
+        assert isinstance(data, list)
         return [NumericResultChannelDto.from_dict(ch) for ch in data]
 
-    def get_targets(self, channel_net_name):
+    def get_targets(self, channel_net_name: str) -> list[str]:
         """Return the physical channel net names that *channel_net_name* can sample.
 
         Args:
@@ -48,10 +45,17 @@ class NumericResultsGroup(ApiGroupBase):
         """
         path = "api/numeric-results/targets?channel={}".format(
             _quote(channel_net_name, safe=""))
-        return self._get_json(path)
+        result = self._get_json(path)
+        assert isinstance(result, list)
+        return result
 
-    def measure(self, channel_net_name, target_net_name,
-                samples=1000, reduced_set=True):
+    def measure(
+        self,
+        channel_net_name: str,
+        target_net_name: str,
+        samples: int = 1000,
+        reduced_set: bool = True,
+    ) -> NumericMeasureResultDto:
         """Configure and trigger a numeric sampling acquisition.
 
         The result is cached server-side.  Call :meth:`get_mean`, :meth:`get_min`,
@@ -74,26 +78,27 @@ class NumericResultsGroup(ApiGroupBase):
             "Samples":        samples,
             "ReducedSet":     reduced_set,
         }
-        return NumericMeasureResultDto.from_dict(
-            self._post_json("api/numeric-results/measure", body))
+        result = self._post_json("api/numeric-results/measure", body)
+        assert isinstance(result, dict)
+        return NumericMeasureResultDto.from_dict(result)
 
-    def get_mean(self, channel_net_name):
+    def get_mean(self, channel_net_name: str) -> float:
         """Return the mean value from the last measurement on *channel_net_name*."""
         return self._get_stat("mean", channel_net_name)
 
-    def get_min(self, channel_net_name):
+    def get_min(self, channel_net_name: str) -> float:
         """Return the minimum value from the last measurement on *channel_net_name*."""
         return self._get_stat("min", channel_net_name)
 
-    def get_max(self, channel_net_name):
+    def get_max(self, channel_net_name: str) -> float:
         """Return the maximum value from the last measurement on *channel_net_name*."""
         return self._get_stat("max", channel_net_name)
 
-    def get_stdev(self, channel_net_name):
+    def get_stdev(self, channel_net_name: str) -> float:
         """Return the standard deviation from the last measurement on *channel_net_name*."""
         return self._get_stat("stdev", channel_net_name)
 
-    def get_samples(self, channel_net_name):
+    def get_samples(self, channel_net_name: str) -> list[float]:
         """Return the raw sample array from the last measurement on *channel_net_name*.
 
         Raises :class:`~accordionq2.AccordionQ2ApiError` (HTTP 400) if the
@@ -101,12 +106,14 @@ class NumericResultsGroup(ApiGroupBase):
         """
         path = "api/numeric-results/result/samples?channel={}".format(
             _quote(channel_net_name, safe=""))
-        return self._get_json(path)
+        result = self._get_json(path)
+        assert isinstance(result, list)
+        return result
 
     # ------------------------------------------------------------------
 
-    def _get_stat(self, stat, channel_net_name):
+    def _get_stat(self, stat: str, channel_net_name: str) -> float:
         path = "api/numeric-results/result/{}?channel={}".format(
             stat, _quote(channel_net_name, safe=""))
         raw = self._get_json(path)
-        return float(raw)
+        return float(raw)  # type: ignore[arg-type]
