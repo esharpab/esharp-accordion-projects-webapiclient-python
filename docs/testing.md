@@ -68,6 +68,7 @@ The CI pipeline (`.github/workflows/ci.yml`) runs automatically on every push an
 | `lint` | Runs `ruff check` and `ruff format --check` |
 | `typecheck` | Runs `mypy --strict` on the `accordionq2` package |
 | `test` | Runs unit tests on Ubuntu, Windows, and macOS × Python 3.11, 3.12, 3.13 |
+| `publish` | Builds wheel + sdist and publishes to PyPI — **only on `v*` tag pushes, after all other jobs pass** |
 
 Integration tests are **not** run in CI (no hardware available).
 
