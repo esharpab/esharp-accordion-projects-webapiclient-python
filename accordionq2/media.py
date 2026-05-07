@@ -18,9 +18,7 @@ class MediaGroup(ApiGroupBase):
 
     def download_file(self, file_name: str) -> bytes:
         """Download a media file as raw bytes."""
-        return self._get_bytes(
-            "api/media/{}".format(quote(file_name, safe=""))
-        )
+        return self._get_bytes("api/media/{}".format(quote(file_name, safe="")))
 
     def upload_file(self, file_name: str, data: bytes) -> None:
         """Upload a media file to the device."""

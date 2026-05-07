@@ -51,8 +51,9 @@ class AccordionQ2Client:
         verify: bool | str = True,
         default_headers: dict[str, str] | None = None,
     ) -> None:
-        self._session = HttpSession(base_url, timeout, auth=auth, verify=verify,
-                                    default_headers=default_headers)
+        self._session = HttpSession(
+            base_url, timeout, auth=auth, verify=verify, default_headers=default_headers
+        )
         self.resources = ResourcesGroup(self._session)
         self.channels = ChannelsGroup(self._session)
         self.modules = ModulesGroup(self._session)

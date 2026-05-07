@@ -61,9 +61,8 @@ class HttpSession:
         self._default_headers: dict[str, str] = dict(default_headers or {})
         if auth is not None:
             import base64
-            credentials = base64.b64encode(
-                f"{auth[0]}:{auth[1]}".encode()
-            ).decode("ascii")
+
+            credentials = base64.b64encode(f"{auth[0]}:{auth[1]}".encode()).decode("ascii")
             self._default_headers["Authorization"] = f"Basic {credentials}"
 
     def _build_ssl_context(self) -> ssl.SSLContext:
@@ -157,6 +156,7 @@ class ApiGroupBase:
         boundary = uuid.uuid4().hex
         # Encode filename per RFC 5987 to handle spaces and non-ASCII safely.
         from urllib.parse import quote as _quote
+
         encoded_name = _quote(filename, safe="")
         part_header = (
             f"--{boundary}\r\n"
@@ -211,4 +211,3 @@ class ApiGroupBase:
                 pass
             raise AccordionQ2ApiError(status, message)
         return data
-

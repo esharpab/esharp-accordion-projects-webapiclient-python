@@ -30,13 +30,23 @@ def _session(*responses: tuple[int, object]) -> HttpSession:
 # ---------------------------------------------------------------------------
 
 _CHANNEL_DATA = {
-    "channelIndex": 0, "index": 0, "enabled": True,
-    "usage": "UserAllocatable", "deviceName": "Dev",
-    "channelType": "Analog", "channelTypeCapability": "Analog",
-    "alias": "CH0", "netName": "NET0", "groupName": "",
-    "capability": 3, "description": "", "direction": 1,
-    "directionChanged": False, "defaultDirection": 1,
-    "unit": "V", "isVirtual": False,
+    "channelIndex": 0,
+    "index": 0,
+    "enabled": True,
+    "usage": "UserAllocatable",
+    "deviceName": "Dev",
+    "channelType": "Analog",
+    "channelTypeCapability": "Analog",
+    "alias": "CH0",
+    "netName": "NET0",
+    "groupName": "",
+    "capability": 3,
+    "description": "",
+    "direction": 1,
+    "directionChanged": False,
+    "defaultDirection": 1,
+    "unit": "V",
+    "isVirtual": False,
 }
 
 
@@ -55,8 +65,9 @@ class TestChannelsGroup:
         ch = grp.get_channel(alias="CH0")
         assert ch.alias == "CH0"
         # Verify the body sent to the server
-        body_sent = json.loads(session.request.call_args[1].get("body") or
-                               session.request.call_args[0][2])
+        body_sent = json.loads(
+            session.request.call_args[1].get("body") or session.request.call_args[0][2]
+        )
         assert body_sent["Alias"] == "CH0"
         assert "NetName" not in body_sent
 
@@ -64,8 +75,9 @@ class TestChannelsGroup:
         session = _session((200, _CHANNEL_DATA))
         grp = ChannelsGroup(session)
         grp.get_channel(net_name="NET0")
-        body_sent = json.loads(session.request.call_args[1].get("body") or
-                               session.request.call_args[0][2])
+        body_sent = json.loads(
+            session.request.call_args[1].get("body") or session.request.call_args[0][2]
+        )
         assert body_sent["NetName"] == "NET0"
         assert "Alias" not in body_sent
 
@@ -74,8 +86,9 @@ class TestChannelsGroup:
         grp = ChannelsGroup(session)
         cfg = ChannelConfigRequest(alias="CH0", enabled=False)
         grp.configure(cfg)
-        body_sent = json.loads(session.request.call_args[1].get("body") or
-                               session.request.call_args[0][2])
+        body_sent = json.loads(
+            session.request.call_args[1].get("body") or session.request.call_args[0][2]
+        )
         assert body_sent["Alias"] == "CH0"
         assert body_sent["Enabled"] is False
         assert "Direction" not in body_sent
@@ -88,8 +101,9 @@ class TestChannelsGroup:
             ChannelConfigRequest(alias="CH1", unit="A"),
         ]
         grp.configure_many(cfgs)
-        body_sent = json.loads(session.request.call_args[1].get("body") or
-                               session.request.call_args[0][2])
+        body_sent = json.loads(
+            session.request.call_args[1].get("body") or session.request.call_args[0][2]
+        )
         assert isinstance(body_sent, list)
         assert len(body_sent) == 2
         assert body_sent[0]["Unit"] == "V"
@@ -98,6 +112,7 @@ class TestChannelsGroup:
 # ---------------------------------------------------------------------------
 # ResourcesGroup
 # ---------------------------------------------------------------------------
+
 
 class TestResourcesGroup:
     def test_get_value_lowercase_key(self):
@@ -131,8 +146,9 @@ class TestResourcesGroup:
         session = _session((200, b""))
         grp = ResourcesGroup(session)
         grp.set_value("VDD", "3.3")
-        body_sent = json.loads(session.request.call_args[1].get("body") or
-                               session.request.call_args[0][2])
+        body_sent = json.loads(
+            session.request.call_args[1].get("body") or session.request.call_args[0][2]
+        )
         assert body_sent["Name"] == "VDD"
         assert body_sent["Value"] == "3.3"
 

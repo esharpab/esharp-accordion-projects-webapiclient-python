@@ -25,6 +25,7 @@ def make_session(responses: list[tuple[int, object]]) -> HttpSession:
     session._default_headers = {}
 
     import threading
+
     session._lock = threading.Lock()
 
     encoded = [

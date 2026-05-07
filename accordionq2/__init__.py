@@ -50,4 +50,3 @@ __all__ = [
     "PhysicalSystemDto",
 ]
 __version__ = "2.0.0"
-

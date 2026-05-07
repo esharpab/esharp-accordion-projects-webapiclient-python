@@ -65,6 +65,4 @@ class ApplicationGroup(ApiGroupBase):
 
     def delete_config_file(self, file_name: str) -> None:
         """Delete a configuration file from the device."""
-        self._delete(
-            "api/application/config/{}".format(quote(file_name, safe=""))
-        )
+        self._delete("api/application/config/{}".format(quote(file_name, safe="")))

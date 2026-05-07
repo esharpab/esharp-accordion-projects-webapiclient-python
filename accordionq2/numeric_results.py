@@ -43,8 +43,7 @@ class NumericResultsGroup(ApiGroupBase):
         Returns:
             A list of strings.
         """
-        path = "api/numeric-results/targets?channel={}".format(
-            _quote(channel_net_name, safe=""))
+        path = "api/numeric-results/targets?channel={}".format(_quote(channel_net_name, safe=""))
         result = self._get_json(path)
         assert isinstance(result, list)
         return result
@@ -74,9 +73,9 @@ class NumericResultsGroup(ApiGroupBase):
         """
         body = {
             "ChannelNetName": channel_net_name,
-            "TargetNetName":  target_net_name,
-            "Samples":        samples,
-            "ReducedSet":     reduced_set,
+            "TargetNetName": target_net_name,
+            "Samples": samples,
+            "ReducedSet": reduced_set,
         }
         result = self._post_json("api/numeric-results/measure", body)
         assert isinstance(result, dict)
@@ -105,7 +104,8 @@ class NumericResultsGroup(ApiGroupBase):
         measurement was taken with ``reduced_set=True``.
         """
         path = "api/numeric-results/result/samples?channel={}".format(
-            _quote(channel_net_name, safe=""))
+            _quote(channel_net_name, safe="")
+        )
         result = self._get_json(path)
         assert isinstance(result, list)
         return result
@@ -114,6 +114,7 @@ class NumericResultsGroup(ApiGroupBase):
 
     def _get_stat(self, stat: str, channel_net_name: str) -> float:
         path = "api/numeric-results/result/{}?channel={}".format(
-            stat, _quote(channel_net_name, safe=""))
+            stat, _quote(channel_net_name, safe="")
+        )
         raw = self._get_json(path)
         return float(raw)  # type: ignore[arg-type]

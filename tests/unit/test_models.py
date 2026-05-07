@@ -32,6 +32,7 @@ from accordionq2.models import (
 # Enum helpers
 # ---------------------------------------------------------------------------
 
+
 class TestParseDirectionTypes:
     def test_integer_in(self):
         assert parse_direction_types(1) == DirectionTypes.IN
@@ -99,6 +100,7 @@ class TestDirectionToJson:
 # ConnectionStatusDto
 # ---------------------------------------------------------------------------
 
+
 class TestConnectionStatusDto:
     def test_from_dict_connected(self):
         dto = ConnectionStatusDto.from_dict({"isConnected": True, "lastError": None})
@@ -131,12 +133,17 @@ class TestConnectionStatusDto:
 # AppLicenseDto
 # ---------------------------------------------------------------------------
 
+
 class TestAppLicenseDto:
     def test_from_dict(self):
-        dto = AppLicenseDto.from_dict({
-            "name": "MyApp", "key": "K1", "expires": "2030-01-01",
-            "type": "SoftwareModule",
-        })
+        dto = AppLicenseDto.from_dict(
+            {
+                "name": "MyApp",
+                "key": "K1",
+                "expires": "2030-01-01",
+                "type": "SoftwareModule",
+            }
+        )
         assert dto.name == "MyApp"
         assert dto.type == AppTypes.SOFTWARE_MODULE
 
@@ -154,12 +161,17 @@ class TestAppLicenseDto:
 # ModuleSettingsDto
 # ---------------------------------------------------------------------------
 
+
 class TestModuleSettingsDto:
     def test_round_trip(self):
         data = {
-            "name": "Mod1", "enabled": True, "className": "Cls",
-            "assemblyPath": "path.dll", "namespace": "NS",
-            "imageName": "img.png", "initialData": {"k": "v"},
+            "name": "Mod1",
+            "enabled": True,
+            "className": "Cls",
+            "assemblyPath": "path.dll",
+            "namespace": "NS",
+            "imageName": "img.png",
+            "initialData": {"k": "v"},
         }
         dto = ModuleSettingsDto.from_dict(data)
         d = dto.to_dict()
@@ -182,6 +194,7 @@ class TestModuleSettingsDto:
 # PhysicalModuleDto / PhysicalSystemDto
 # ---------------------------------------------------------------------------
 
+
 class TestPhysicalSystemDto:
     def test_from_dict_with_modules(self):
         data = {
@@ -191,8 +204,13 @@ class TestPhysicalSystemDto:
             "firmware": "1.0.0",
             "mac": "AA:BB:CC:DD:EE:FF",
             "modules": [
-                {"index": 0, "name": "Base", "productID": "ESH001",
-                 "revision": 1, "serialNumber": "SN123"},
+                {
+                    "index": 0,
+                    "name": "Base",
+                    "productID": "ESH001",
+                    "revision": 1,
+                    "serialNumber": "SN123",
+                },
             ],
             "networkInterfaces": {},
         }
@@ -214,15 +232,26 @@ class TestPhysicalSystemDto:
 # ChannelDto
 # ---------------------------------------------------------------------------
 
+
 class TestChannelDto:
     _FULL: ClassVar[dict] = {
-        "channelIndex": 3, "index": 3, "enabled": True,
-        "usage": "UserAllocatable", "deviceName": "Dev1",
-        "channelType": "Analog", "channelTypeCapability": "Analog",
-        "alias": "MY_CH", "netName": "NET1", "groupName": "GRP",
-        "capability": 3, "description": "Test", "direction": 1,
-        "directionChanged": False, "defaultDirection": 1,
-        "unit": "V", "isVirtual": False,
+        "channelIndex": 3,
+        "index": 3,
+        "enabled": True,
+        "usage": "UserAllocatable",
+        "deviceName": "Dev1",
+        "channelType": "Analog",
+        "channelTypeCapability": "Analog",
+        "alias": "MY_CH",
+        "netName": "NET1",
+        "groupName": "GRP",
+        "capability": 3,
+        "description": "Test",
+        "direction": 1,
+        "directionChanged": False,
+        "defaultDirection": 1,
+        "unit": "V",
+        "isVirtual": False,
     }
 
     def test_from_dict_full(self):
@@ -266,6 +295,7 @@ class TestChannelDto:
 # ---------------------------------------------------------------------------
 # ChannelLookupRequest / ChannelConfigRequest
 # ---------------------------------------------------------------------------
+
 
 class TestChannelLookupRequest:
     def test_alias_only(self):
@@ -311,12 +341,17 @@ class TestChannelConfigRequest:
 # BusTransactionResponse
 # ---------------------------------------------------------------------------
 
+
 class TestBusTransactionResponse:
     def test_hex_decoded(self):
-        dto = BusTransactionResponse.from_dict({
-            "deviceName": "Dev", "action": "Receive",
-            "received": "DEADBEEF", "numberOfBytesReceived": 4,
-        })
+        dto = BusTransactionResponse.from_dict(
+            {
+                "deviceName": "Dev",
+                "action": "Receive",
+                "received": "DEADBEEF",
+                "numberOfBytesReceived": 4,
+            }
+        )
         assert dto.received == bytes([0xDE, 0xAD, 0xBE, 0xEF])
         assert dto.number_of_bytes_received == 4
 
@@ -333,13 +368,18 @@ class TestBusTransactionResponse:
 # NumericResultChannelDto
 # ---------------------------------------------------------------------------
 
+
 class TestNumericResultChannelDto:
     def test_from_dict(self):
-        dto = NumericResultChannelDto.from_dict({
-            "netName": "NR1", "alias": "NR_A",
-            "possibleTargetNames": ["T1", "T2"],
-            "sampleRate": 1000, "defaultSamples": 500,
-        })
+        dto = NumericResultChannelDto.from_dict(
+            {
+                "netName": "NR1",
+                "alias": "NR_A",
+                "possibleTargetNames": ["T1", "T2"],
+                "sampleRate": 1000,
+                "defaultSamples": 500,
+            }
+        )
         assert dto.net_name == "NR1"
         assert dto.possible_target_names == ("T1", "T2")
         assert dto.sample_rate == 1000
@@ -353,13 +393,21 @@ class TestNumericResultChannelDto:
 # NumericMeasureResultDto
 # ---------------------------------------------------------------------------
 
+
 class TestNumericMeasureResultDto:
     def test_from_dict(self):
-        dto = NumericMeasureResultDto.from_dict({
-            "channelNetName": "NR1", "targetNetName": "V1",
-            "sampleCount": 1000, "sampleRate": 1000,
-            "reducedSet": True, "started": "T0", "stopped": "T1", "duration": "1s",
-        })
+        dto = NumericMeasureResultDto.from_dict(
+            {
+                "channelNetName": "NR1",
+                "targetNetName": "V1",
+                "sampleCount": 1000,
+                "sampleRate": 1000,
+                "reducedSet": True,
+                "started": "T0",
+                "stopped": "T1",
+                "duration": "1s",
+            }
+        )
         assert dto.channel_net_name == "NR1"
         assert dto.sample_count == 1000
         assert dto.reduced_set is True
