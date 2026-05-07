@@ -14,10 +14,10 @@ natural.
 
 | Requirement | Details |
 |-------------|---------|
-| Python      | 3.8 or later |
-| Platform    | Windows, Linux (including ARM / Raspberry Pi) |
+| Python      | 3.11 or later |
+| Platform    | Windows, Linux (including ARM / Raspberry Pi), macOS |
 | Architecture | 32-bit and 64-bit |
-| Dependencies | **None** &mdash; stdlib only (`urllib`, `json`, `enum`, `dataclasses`) |
+| Dependencies | **None** &mdash; stdlib only (`http.client`, `json`, `ssl`, `threading`, `dataclasses`) |
 
 ## Installation
 

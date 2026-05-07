@@ -46,5 +46,5 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 
 | Platform | Package |
 |----------|---------|
-| Python 3.8+ | [`accordionq2`](https://pypi.org/project/accordionq2/) via pip |
+| Python 3.11+ | [`accordionq2`](https://pypi.org/project/accordionq2/) via pip |
 | .NET Standard 2.0+ | [`AccordionQ2.WebApiClient`](https://www.nuget.org/packages/AccordionQ2.WebApiClient/) via NuGet |
