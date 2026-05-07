@@ -9,10 +9,9 @@ import pytest
 
 from accordionq2._base import HttpSession
 from accordionq2.channels import ChannelsGroup
-from accordionq2.resources import ResourcesGroup
 from accordionq2.exceptions import AccordionQ2ApiError
 from accordionq2.models import ChannelConfigRequest, ChannelDto
-from accordionq2.enums import DirectionTypes, ChannelTypes, MpioUsageTypes
+from accordionq2.resources import ResourcesGroup
 
 
 def _session(*responses: tuple[int, object]) -> HttpSession:

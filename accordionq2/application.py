@@ -25,7 +25,9 @@ class ApplicationGroup(ApiGroupBase):
 
     def get_status(self) -> ModuleStatus:
         """Return the current application module status."""
-        return ModuleStatus(self._get_json("api/application/status"))
+        result = self._get_json("api/application/status")
+        assert isinstance(result, str)
+        return ModuleStatus(result)
 
     def reset(self) -> None:
         """Send a reset command to the application engine."""

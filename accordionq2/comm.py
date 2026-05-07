@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from ._base import ApiGroupBase
 from .enums import BusActions
 from .models import BusTransactionResponse
@@ -76,7 +78,7 @@ class CommGroup(ApiGroupBase):
 
         Args:
             device_name: Device name as registered in the hardware manager.
-            address: I2C 7-bit device address (0–127).
+            address: I2C 7-bit device address (0-127).
             action: :class:`~accordionq2.enums.BusActions` value (or string).
             data_to_send: Bytes to transmit. Required for ``Send``/``SendReceive``.
             number_of_bytes_to_receive: Expected receive count for ``Receive``/``SendReceive``.
@@ -85,7 +87,7 @@ class CommGroup(ApiGroupBase):
         Returns:
             :class:`~accordionq2.models.BusTransactionResponse`
         """
-        body: dict = {
+        body: dict[str, Any] = {
             "DeviceName": device_name,
             "Address": format(address, "02X"),
             "Action": _action_value(action),
@@ -119,7 +121,7 @@ class CommGroup(ApiGroupBase):
         Returns:
             :class:`~accordionq2.models.BusTransactionResponse`
         """
-        body: dict = {
+        body: dict[str, Any] = {
             "DeviceName": device_name,
             "Action": _action_value(action),
             "NumberOfBytesToReceive": number_of_bytes_to_receive,
@@ -150,7 +152,7 @@ class CommGroup(ApiGroupBase):
         Returns:
             :class:`~accordionq2.models.BusTransactionResponse`
         """
-        body: dict = {
+        body: dict[str, Any] = {
             "DeviceName": device_name,
             "Action": _action_value(action),
             "NumberOfBytesToReceive": number_of_bytes_to_receive,
@@ -183,14 +185,14 @@ class CommGroup(ApiGroupBase):
             port: Remote TCP port number.
             data_to_send: Bytes to send. Required for ``Send``/``SendReceive``.
             number_of_bytes_to_receive: Expected receive count for ``Receive``/``SendReceive``.
-            termination_byte: Byte value used as a message boundary (0–255).
+            termination_byte: Byte value used as a message boundary (0-255).
             use_termination_byte: Whether to treat ``termination_byte`` as an end-of-message marker.
             timeout_ms: Receive timeout in milliseconds.
 
         Returns:
             :class:`~accordionq2.models.BusTransactionResponse`
         """
-        body: dict = {
+        body: dict[str, Any] = {
             "DeviceName": device_name,
             "Action": _action_value(action),
             "HostName": host_name,

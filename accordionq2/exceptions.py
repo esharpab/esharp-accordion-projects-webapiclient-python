@@ -11,4 +11,4 @@ class AccordionQ2ApiError(Exception):
         self.status_code = status_code
 
     def __repr__(self) -> str:
-        return "AccordionQ2ApiError({}, {!r})".format(self.status_code, self.args[0])
+        return f"AccordionQ2ApiError({self.status_code}, {self.args[0]!r})"

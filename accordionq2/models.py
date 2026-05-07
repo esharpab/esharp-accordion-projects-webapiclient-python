@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from .enums import (
     AppTypes,
-    BusActions,  # noqa: F401 – re-exported for convenience
+    BusActions,  # noqa: F401 - re-exported for convenience
     ChannelTypes,
     DirectionTypes,
     MpioUsageTypes,
@@ -24,7 +25,7 @@ class ConnectionStatusDto:
     last_error: str | None = None
 
     @classmethod
-    def from_dict(cls, data: dict) -> ConnectionStatusDto:
+    def from_dict(cls, data: dict[str, Any]) -> ConnectionStatusDto:
         return cls(
             is_connected=data.get("isConnected", False),
             last_error=data.get("lastError"),
@@ -41,7 +42,7 @@ class AppLicenseDto:
     type: AppTypes = AppTypes.UNKNOWN
 
     @classmethod
-    def from_dict(cls, data: dict) -> AppLicenseDto:
+    def from_dict(cls, data: dict[str, Any]) -> AppLicenseDto:
         raw_type = data.get("type", "Unknown")
         try:
             app_type = AppTypes(raw_type)
@@ -65,10 +66,10 @@ class ModuleSettingsDto:
     assembly_path: str = ""
     namespace: str = ""
     image_name: str = ""
-    initial_data: dict = field(default_factory=dict)
+    initial_data: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: dict) -> ModuleSettingsDto:
+    def from_dict(cls, data: dict[str, Any]) -> ModuleSettingsDto:
         return cls(
             name=data.get("name", ""),
             enabled=data.get("enabled", False),
@@ -79,7 +80,7 @@ class ModuleSettingsDto:
             initial_data=data.get("initialData") or {},
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "Name": self.name,
             "Enabled": self.enabled,
@@ -102,7 +103,7 @@ class PhysicalModuleDto:
     serial_number: str = ""
 
     @classmethod
-    def from_dict(cls, data: dict) -> PhysicalModuleDto:
+    def from_dict(cls, data: dict[str, Any]) -> PhysicalModuleDto:
         return cls(
             index=data.get("index", 0),
             name=data.get("name", ""),
@@ -122,10 +123,10 @@ class PhysicalSystemDto:
     firmware: str = ""
     mac: str = ""
     modules: tuple[PhysicalModuleDto, ...] = field(default_factory=tuple)
-    network_interfaces: dict = field(default_factory=dict)
+    network_interfaces: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: dict) -> PhysicalSystemDto:
+    def from_dict(cls, data: dict[str, Any]) -> PhysicalSystemDto:
         modules_data = data.get("modules") or []
         return cls(
             host=data.get("host", ""),
@@ -161,7 +162,7 @@ class ChannelDto:
     is_virtual: bool = False
 
     @classmethod
-    def from_dict(cls, data: dict) -> ChannelDto:
+    def from_dict(cls, data: dict[str, Any]) -> ChannelDto:
         raw_usage = data.get("usage", "Undefined")
         try:
             usage = MpioUsageTypes(raw_usage)
@@ -195,8 +196,8 @@ class ChannelLookupRequest:
     alias: str | None = None
     net_name: str | None = None
 
-    def to_dict(self) -> dict:
-        result: dict = {}
+    def to_dict(self) -> dict[str, str]:
+        result: dict[str, str] = {}
         if self.alias is not None:
             result["Alias"] = self.alias
         if self.net_name is not None:
@@ -220,8 +221,8 @@ class ChannelConfigRequest:
     group_name: str | None = None
     device_name: str | None = None
 
-    def to_dict(self) -> dict:
-        result: dict = {}
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {}
         if self.alias is not None:
             result["Alias"] = self.alias
         if self.net_name is not None:
@@ -251,7 +252,7 @@ class BusTransactionResponse:
     number_of_bytes_received: int = 0
 
     @classmethod
-    def from_dict(cls, data: dict) -> BusTransactionResponse:
+    def from_dict(cls, data: dict[str, Any]) -> BusTransactionResponse:
         raw = data.get("received") or ""
         try:
             received = bytes.fromhex(raw) if raw else b""
@@ -276,7 +277,7 @@ class NumericResultChannelDto:
     default_samples: int = 0
 
     @classmethod
-    def from_dict(cls, data: dict) -> NumericResultChannelDto:
+    def from_dict(cls, data: dict[str, Any]) -> NumericResultChannelDto:
         return cls(
             net_name=data.get("netName", ""),
             alias=data.get("alias", ""),
@@ -300,7 +301,7 @@ class NumericMeasureResultDto:
     duration: str = ""
 
     @classmethod
-    def from_dict(cls, data: dict) -> NumericMeasureResultDto:
+    def from_dict(cls, data: dict[str, Any]) -> NumericMeasureResultDto:
         return cls(
             channel_net_name=data.get("channelNetName", ""),
             target_net_name=data.get("targetNetName", ""),

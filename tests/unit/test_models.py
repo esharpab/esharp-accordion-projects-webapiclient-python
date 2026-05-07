@@ -2,33 +2,31 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 from accordionq2.enums import (
+    AppTypes,
     ChannelTypes,
     DirectionTypes,
     MpioUsageTypes,
-    AppTypes,
-    ModuleStatus,
-    BusActions,
+    direction_to_json,
     parse_channel_types,
     parse_direction_types,
-    direction_to_json,
 )
 from accordionq2.models import (
-    ChannelDto,
+    AppLicenseDto,
+    BusTransactionResponse,
     ChannelConfigRequest,
+    ChannelDto,
     ChannelLookupRequest,
     ConnectionStatusDto,
-    AppLicenseDto,
     ModuleSettingsDto,
-    PhysicalModuleDto,
-    PhysicalSystemDto,
-    BusTransactionResponse,
-    NumericResultChannelDto,
     NumericMeasureResultDto,
+    NumericResultChannelDto,
+    PhysicalSystemDto,
 )
-
 
 # ---------------------------------------------------------------------------
 # Enum helpers
@@ -217,7 +215,7 @@ class TestPhysicalSystemDto:
 # ---------------------------------------------------------------------------
 
 class TestChannelDto:
-    _FULL = {
+    _FULL: ClassVar[dict] = {
         "channelIndex": 3, "index": 3, "enabled": True,
         "usage": "UserAllocatable", "deviceName": "Dev1",
         "channelType": "Analog", "channelTypeCapability": "Analog",

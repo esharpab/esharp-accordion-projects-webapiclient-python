@@ -62,7 +62,7 @@ class HttpSession:
         if auth is not None:
             import base64
             credentials = base64.b64encode(
-                f"{auth[0]}:{auth[1]}".encode("utf-8")
+                f"{auth[0]}:{auth[1]}".encode()
             ).decode("ascii")
             self._default_headers["Authorization"] = f"Basic {credentials}"
 
@@ -159,18 +159,18 @@ class ApiGroupBase:
         from urllib.parse import quote as _quote
         encoded_name = _quote(filename, safe="")
         part_header = (
-            "--{boundary}\r\n"
+            f"--{boundary}\r\n"
             'Content-Disposition: form-data; name="file"; '
-            "filename*=UTF-8''{filename}\r\n"
+            f"filename*=UTF-8''{encoded_name}\r\n"
             "Content-Type: application/octet-stream\r\n\r\n"
-        ).format(boundary=boundary, filename=encoded_name).encode("utf-8")
-        part_footer = "\r\n--{}--\r\n".format(boundary).encode("utf-8")
+        ).encode()
+        part_footer = f"\r\n--{boundary}--\r\n".encode()
         multipart_body = part_header + data + part_footer
         self._request(
             "POST",
             path,
             body=multipart_body,
-            headers={"Content-Type": "multipart/form-data; boundary={}".format(boundary)},
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
         )
 
     def _delete(self, path: str) -> None:

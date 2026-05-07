@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from ._base import ApiGroupBase
 from .exceptions import AccordionQ2ApiError
 
@@ -16,7 +18,7 @@ def _extract_value(result: object, path: str) -> str:
         raise AccordionQ2ApiError(200, f"Unexpected response shape from {path}: {result!r}")
     for key in ("value", "Value"):
         if key in result:
-            return result[key]
+            return cast(str, result[key])
     raise AccordionQ2ApiError(200, f"Missing 'value' key in response from {path}: {result!r}")
 
 
@@ -50,7 +52,7 @@ class ResourcesGroup(ApiGroupBase):
         """
         result = self._post_json("api/resources/values/get", {"Names": names})
         assert isinstance(result, dict)
-        return result["resources"]
+        return cast(dict[str, str], result["resources"])
 
     def set_values(self, resources: dict[str, str]) -> None:
         """Set values for multiple resources in one round-trip.

@@ -66,10 +66,7 @@ select = [
     "RUF",  # ruff-specific (includes RUF012 – mutable class vars)
     "ANN",  # flake8-annotations (type hint enforcement)
 ]
-ignore = [
-    "ANN101",  # missing type for `self`
-    "ANN102",  # missing type for `cls`
-]
+ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ANN"]  # no annotation enforcement in tests

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import http.client
 import json
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -30,7 +29,7 @@ def _make_session(status: int = 200, body: object = None) -> HttpSession:
 
 
 # ---------------------------------------------------------------------------
-# HttpSession – basic request flow
+# HttpSession - basic request flow
 # ---------------------------------------------------------------------------
 
 class TestHttpSession:
@@ -78,7 +77,7 @@ class TestHttpSession:
                 session._conn = good_conn
 
             mock_connect.side_effect = set_good_conn
-            status, data = session.request("GET", "api/test")
+            status, _data = session.request("GET", "api/test")
         assert status == 200
 
     def test_default_headers_merged(self):
@@ -105,7 +104,7 @@ class TestHttpSession:
 
 
 # ---------------------------------------------------------------------------
-# ApiGroupBase – error handling
+# ApiGroupBase - error handling
 # ---------------------------------------------------------------------------
 
 class TestApiGroupBaseErrors:
@@ -165,7 +164,7 @@ class TestApiGroupBaseErrors:
 
 
 # ---------------------------------------------------------------------------
-# ApiGroupBase – multipart upload
+# ApiGroupBase - multipart upload
 # ---------------------------------------------------------------------------
 
 class TestMultipartUpload:

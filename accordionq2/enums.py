@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from enum import Enum, IntFlag
+from enum import IntFlag, StrEnum
 
 
-class ModuleStatus(str, Enum):
+class ModuleStatus(StrEnum):
     """Application module status."""
 
     UNKNOWN = "Unknown"
@@ -15,7 +15,7 @@ class ModuleStatus(str, Enum):
     DISABLED = "Disabled"
 
 
-class AppTypes(str, Enum):
+class AppTypes(StrEnum):
     """Application/module type classification."""
 
     UNKNOWN = "Unknown"
@@ -31,7 +31,7 @@ class DirectionTypes(IntFlag):
     OUT = 2
 
 
-class MpioUsageTypes(str, Enum):
+class MpioUsageTypes(StrEnum):
     """Multi-purpose I/O usage classification."""
 
     UNDEFINED = "Undefined"
@@ -41,7 +41,7 @@ class MpioUsageTypes(str, Enum):
     BUS_SIGNAL = "BusSignal"
 
 
-class BusActions(str, Enum):
+class BusActions(StrEnum):
     """Bus transaction action, mirroring ``BusTransactionTypes.BusActions``."""
 
     UNDEFINED = "Undefined"
