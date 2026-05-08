@@ -177,7 +177,7 @@ class TestCommGroupUart:
     def test_returns_bus_transaction_response(self):
         session = _session((200, _UART_RESPONSE))
         grp = CommGroup(session)
-        resp = grp.uart("MyUart", BusActions.SEND_RECEIVE, port_name="/dev/ttyS0",
+        resp = grp.uart("MyUart", BusActions.SEND_RECEIVE,
                         data_to_send=b"\x2A", number_of_bytes_to_receive=4)
         assert isinstance(resp, BusTransactionResponse)
         assert resp.received == b"ABCD"
@@ -201,7 +201,6 @@ class TestCommGroupUart:
         session = _session((200, _UART_RESPONSE))
         grp = CommGroup(session)
         grp.uart("MyUart", BusActions.SEND,
-                 port_name="COM3",
                  baud_rate=115200,
                  parity=ParityTypes.ODD,
                  flow_control=FlowControlTypes.RTS_CTS,
@@ -210,7 +209,6 @@ class TestCommGroupUart:
         body = json.loads(
             session.request.call_args[1].get("body") or session.request.call_args[0][2]
         )
-        assert body["PortName"] == "COM3"
         assert body["BaudRate"] == 115200
         assert body["Parity"] == "Odd"
         assert body["FlowControl"] == "RTS_CTS"

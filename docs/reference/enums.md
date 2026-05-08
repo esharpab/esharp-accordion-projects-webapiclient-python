@@ -167,7 +167,6 @@ from accordionq2.enums import FlowControlTypes, ParityTypes, UartBusTypes
 resp = client.comm.uart(
     "MyDevice",
     action=BusActions.SEND_RECEIVE,
-    port_name="/dev/ttyS0",
     baud_rate=115200,
     bus_type=UartBusTypes.RS485,
     flow_control=FlowControlTypes.NONE,

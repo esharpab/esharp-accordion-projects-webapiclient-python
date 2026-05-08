@@ -74,7 +74,7 @@ resp = client.comm.i2c("0.ESH10000597.I2C00", address=0x50,
 
 ```python
 client.comm.uart(device_name, action,
-                 port_name="", baud_rate=9600,
+                 baud_rate=9600,
                  bus_type=UartBusTypes.RS232,
                  flow_control=FlowControlTypes.NONE,
                  parity=ParityTypes.NONE,
@@ -87,7 +87,6 @@ client.comm.uart(device_name, action,
 |-----------|------|---------|-------------|
 | `device_name` | `str` | — | Device name as registered in the hardware manager |
 | `action` | `BusActions` | — | `SEND`, `RECEIVE`, `SEND_RECEIVE`, or `CLEAR_BUFFERS` |
-| `port_name` | `str` | `""` | Serial port identifier (e.g. `"/dev/ttyS0"` or `"COM3"`) |
 | `baud_rate` | `int` | `9600` | Baud rate (e.g. `9600`, `115200`) |
 | `bus_type` | `UartBusTypes` | `RS232` | Electrical standard |
 | `flow_control` | `FlowControlTypes` | `NONE` | Flow control mode |
@@ -107,7 +106,6 @@ from accordionq2.enums import BusActions, FlowControlTypes, ParityTypes, UartBus
 resp = client.comm.uart(
     "MyUartDevice",
     action=BusActions.SEND_RECEIVE,
-    port_name="/dev/ttyS0",
     baud_rate=115200,
     bus_type=UartBusTypes.RS232,
     parity=ParityTypes.NONE,

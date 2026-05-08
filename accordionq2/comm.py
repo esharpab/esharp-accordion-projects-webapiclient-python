@@ -47,7 +47,6 @@ class CommGroup(ApiGroupBase):
 
         # UART: send and receive
         resp = client.comm.uart("MyUartDevice",
-                                port_name="/dev/ttyS0",
                                 baud_rate=115200,
                                 action=BusActions.SEND_RECEIVE,
                                 data_to_send=b"*IDN?\\n",
@@ -107,7 +106,6 @@ class CommGroup(ApiGroupBase):
         self,
         device_name: str,
         action: BusActions | str,
-        port_name: str = "",
         baud_rate: int = 9600,
         bus_type: UartBusTypes | str = UartBusTypes.RS232,
         flow_control: FlowControlTypes | str = FlowControlTypes.NONE,
@@ -123,7 +121,6 @@ class CommGroup(ApiGroupBase):
         Args:
             device_name: Device name as registered in the hardware manager.
             action: :class:`~accordionq2.enums.BusActions` value (or string).
-            port_name: Serial port identifier (e.g. ``"/dev/ttyS0"`` or ``"COM3"``).
             baud_rate: Baud rate (e.g. ``9600``, ``115200``).
             bus_type: Electrical standard (:class:`~accordionq2.enums.UartBusTypes`).
             flow_control: Flow control mode (:class:`~accordionq2.enums.FlowControlTypes`).
@@ -140,7 +137,6 @@ class CommGroup(ApiGroupBase):
         body: dict[str, Any] = {
             "DeviceName": device_name,
             "Action": _action_value(action),
-            "PortName": port_name,
             "BaudRate": baud_rate,
             "BusType": bus_type.value if isinstance(bus_type, UartBusTypes) else str(bus_type),
             "FlowControl": flow_control.value if isinstance(flow_control, FlowControlTypes) else str(flow_control),
