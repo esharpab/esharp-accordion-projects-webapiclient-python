@@ -126,7 +126,8 @@ class CommGroup(ApiGroupBase):
             flow_control: Flow control mode (:class:`~accordionq2.enums.FlowControlTypes`).
             parity: Parity setting (:class:`~accordionq2.enums.ParityTypes`).
             use_termination_byte: Whether to use ``termination_byte`` as a receive boundary.
-            termination_byte: Termination byte value (0-255). Only used when ``use_termination_byte`` is ``True``.
+            termination_byte: Termination byte value (0-255). Only used when
+                ``use_termination_byte`` is ``True``.
             data_to_send: Bytes to transmit. Required for ``Send``/``SendReceive``.
             number_of_bytes_to_receive: Expected receive count for ``Receive``/``SendReceive``.
             timeout_ms: Receive timeout in milliseconds.
@@ -139,7 +140,11 @@ class CommGroup(ApiGroupBase):
             "Action": _action_value(action),
             "BaudRate": baud_rate,
             "BusType": bus_type.value if isinstance(bus_type, UartBusTypes) else str(bus_type),
-            "FlowControl": flow_control.value if isinstance(flow_control, FlowControlTypes) else str(flow_control),
+            "FlowControl": (
+                flow_control.value
+                if isinstance(flow_control, FlowControlTypes)
+                else str(flow_control)
+            ),
             "Parity": parity.value if isinstance(parity, ParityTypes) else str(parity),
             "UseTerminationByte": use_termination_byte,
             "TerminationByte": format(termination_byte, "02X"),

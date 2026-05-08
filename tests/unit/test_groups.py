@@ -162,7 +162,7 @@ class TestResourcesGroup:
 
 
 # ---------------------------------------------------------------------------
-# CommGroup – UART
+# CommGroup - UART
 # ---------------------------------------------------------------------------
 
 _UART_RESPONSE = {
@@ -177,8 +177,9 @@ class TestCommGroupUart:
     def test_returns_bus_transaction_response(self):
         session = _session((200, _UART_RESPONSE))
         grp = CommGroup(session)
-        resp = grp.uart("MyUart", BusActions.SEND_RECEIVE,
-                        data_to_send=b"\x2A", number_of_bytes_to_receive=4)
+        resp = grp.uart(
+            "MyUart", BusActions.SEND_RECEIVE, data_to_send=b"\x2a", number_of_bytes_to_receive=4
+        )
         assert isinstance(resp, BusTransactionResponse)
         assert resp.received == b"ABCD"
         assert resp.number_of_bytes_received == 4
@@ -186,7 +187,7 @@ class TestCommGroupUart:
     def test_default_fields_sent(self):
         session = _session((200, _UART_RESPONSE))
         grp = CommGroup(session)
-        grp.uart("MyUart", BusActions.SEND, data_to_send=b"\xFF")
+        grp.uart("MyUart", BusActions.SEND, data_to_send=b"\xff")
         body = json.loads(
             session.request.call_args[1].get("body") or session.request.call_args[0][2]
         )
@@ -200,12 +201,15 @@ class TestCommGroupUart:
     def test_custom_baud_and_parity(self):
         session = _session((200, _UART_RESPONSE))
         grp = CommGroup(session)
-        grp.uart("MyUart", BusActions.SEND,
-                 baud_rate=115200,
-                 parity=ParityTypes.ODD,
-                 flow_control=FlowControlTypes.RTS_CTS,
-                 bus_type=UartBusTypes.RS485,
-                 data_to_send=b"\x01")
+        grp.uart(
+            "MyUart",
+            BusActions.SEND,
+            baud_rate=115200,
+            parity=ParityTypes.ODD,
+            flow_control=FlowControlTypes.RTS_CTS,
+            bus_type=UartBusTypes.RS485,
+            data_to_send=b"\x01",
+        )
         body = json.loads(
             session.request.call_args[1].get("body") or session.request.call_args[0][2]
         )
