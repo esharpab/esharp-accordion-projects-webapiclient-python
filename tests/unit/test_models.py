@@ -10,7 +10,10 @@ from accordionq2.enums import (
     AppTypes,
     ChannelTypes,
     DirectionTypes,
+    FlowControlTypes,
     MpioUsageTypes,
+    ParityTypes,
+    UartBusTypes,
     direction_to_json,
     parse_channel_types,
     parse_direction_types,
@@ -94,6 +97,45 @@ class TestDirectionToJson:
         result = direction_to_json(DirectionTypes.IN | DirectionTypes.OUT)
         assert "IN" in result
         assert "OUT" in result
+
+
+# ---------------------------------------------------------------------------
+# UartBusTypes / FlowControlTypes / ParityTypes
+# ---------------------------------------------------------------------------
+
+
+class TestUartBusTypes:
+    def test_values_match_api_strings(self):
+        assert UartBusTypes.RS232.value == "RS232"
+        assert UartBusTypes.RS422.value == "RS422"
+        assert UartBusTypes.RS485.value == "RS485"
+        assert UartBusTypes.UNDEFINED.value == "Undefined"
+
+    def test_construct_from_string(self):
+        assert UartBusTypes("RS485") is UartBusTypes.RS485
+
+
+class TestFlowControlTypes:
+    def test_none_value(self):
+        assert FlowControlTypes.NONE.value == "None"
+
+    def test_rts_cts_value(self):
+        assert FlowControlTypes.RTS_CTS.value == "RTS_CTS"
+
+    def test_construct_from_string(self):
+        assert FlowControlTypes("XON_XOFF") is FlowControlTypes.XON_XOFF
+
+
+class TestParityTypes:
+    def test_none_value(self):
+        assert ParityTypes.NONE.value == "None"
+
+    def test_odd_even(self):
+        assert ParityTypes.ODD.value == "Odd"
+        assert ParityTypes.EVEN.value == "Even"
+
+    def test_construct_from_string(self):
+        assert ParityTypes("Mark") is ParityTypes.MARK
 
 
 # ---------------------------------------------------------------------------

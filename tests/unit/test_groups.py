@@ -9,8 +9,10 @@ import pytest
 
 from accordionq2._base import HttpSession
 from accordionq2.channels import ChannelsGroup
+from accordionq2.comm import CommGroup
+from accordionq2.enums import BusActions, FlowControlTypes, ParityTypes, UartBusTypes
 from accordionq2.exceptions import AccordionQ2ApiError
-from accordionq2.models import ChannelConfigRequest, ChannelDto
+from accordionq2.models import BusTransactionResponse, ChannelConfigRequest, ChannelDto
 from accordionq2.resources import ResourcesGroup
 
 
@@ -157,3 +159,77 @@ class TestResourcesGroup:
         grp = ResourcesGroup(session)
         result = grp.get_values(["VDD", "GND"])
         assert result == {"VDD": "3.3", "GND": "0"}
+
+
+# ---------------------------------------------------------------------------
+# CommGroup – UART
+# ---------------------------------------------------------------------------
+
+_UART_RESPONSE = {
+    "deviceName": "MyUart",
+    "action": "SendReceive",
+    "received": "41424344",
+    "numberOfBytesReceived": 4,
+}
+
+
+class TestCommGroupUart:
+    def test_returns_bus_transaction_response(self):
+        session = _session((200, _UART_RESPONSE))
+        grp = CommGroup(session)
+        resp = grp.uart("MyUart", BusActions.SEND_RECEIVE, port_name="/dev/ttyS0",
+                        data_to_send=b"\x2A", number_of_bytes_to_receive=4)
+        assert isinstance(resp, BusTransactionResponse)
+        assert resp.received == b"ABCD"
+        assert resp.number_of_bytes_received == 4
+
+    def test_default_fields_sent(self):
+        session = _session((200, _UART_RESPONSE))
+        grp = CommGroup(session)
+        grp.uart("MyUart", BusActions.SEND, data_to_send=b"\xFF")
+        body = json.loads(
+            session.request.call_args[1].get("body") or session.request.call_args[0][2]
+        )
+        assert body["BaudRate"] == 9600
+        assert body["BusType"] == "RS232"
+        assert body["FlowControl"] == "None"
+        assert body["Parity"] == "None"
+        assert body["UseTerminationByte"] is False
+        assert body["TerminationByte"] == "0A"
+
+    def test_custom_baud_and_parity(self):
+        session = _session((200, _UART_RESPONSE))
+        grp = CommGroup(session)
+        grp.uart("MyUart", BusActions.SEND,
+                 port_name="COM3",
+                 baud_rate=115200,
+                 parity=ParityTypes.ODD,
+                 flow_control=FlowControlTypes.RTS_CTS,
+                 bus_type=UartBusTypes.RS485,
+                 data_to_send=b"\x01")
+        body = json.loads(
+            session.request.call_args[1].get("body") or session.request.call_args[0][2]
+        )
+        assert body["PortName"] == "COM3"
+        assert body["BaudRate"] == 115200
+        assert body["Parity"] == "Odd"
+        assert body["FlowControl"] == "RTS_CTS"
+        assert body["BusType"] == "RS485"
+
+    def test_data_to_send_hex_encoded(self):
+        session = _session((200, _UART_RESPONSE))
+        grp = CommGroup(session)
+        grp.uart("MyUart", BusActions.SEND, data_to_send=bytes([0xDE, 0xAD, 0xBE, 0xEF]))
+        body = json.loads(
+            session.request.call_args[1].get("body") or session.request.call_args[0][2]
+        )
+        assert body["DataToSend"] == "DEADBEEF"
+
+    def test_no_data_omits_field(self):
+        session = _session((200, _UART_RESPONSE))
+        grp = CommGroup(session)
+        grp.uart("MyUart", BusActions.RECEIVE, number_of_bytes_to_receive=8)
+        body = json.loads(
+            session.request.call_args[1].get("body") or session.request.call_args[0][2]
+        )
+        assert "DataToSend" not in body

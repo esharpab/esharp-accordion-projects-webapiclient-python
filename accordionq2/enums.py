@@ -54,6 +54,38 @@ class BusActions(StrEnum):
     RECONFIGURE = "Reconfigure"
 
 
+class UartBusTypes(StrEnum):
+    """UART electrical standard, mirroring ``BusTransactionTypes.UartBusTypes``."""
+
+    UNDEFINED = "Undefined"
+    RS232 = "RS232"
+    RS422 = "RS422"
+    RS485 = "RS485"
+
+
+class FlowControlTypes(StrEnum):
+    """UART flow control mode, mirroring ``BusTransactionTypes.FlowControlTypes``."""
+
+    UNDEFINED = "Undefined"
+    NONE = "None"
+    XON_XOFF = "XON_XOFF"
+    RTS_CTS = "RTS_CTS"
+    RTS_CTS_AND_XON_XOFF = "RTS_CTS_AND_XON_XOFF"
+    DTR_DSR = "DTR_DSR"
+    DTR_DSR_AND_XON_XOFF = "DTR_DSR_AND_XON_XOFF"
+
+
+class ParityTypes(StrEnum):
+    """Serial parity setting, mirroring ``InstrumentTypes.ParityTypes``."""
+
+    UNDEFINED = "Undefined"
+    EVEN = "Even"
+    MARK = "Mark"
+    NONE = "None"
+    ODD = "Odd"
+    SPACE = "Space"
+
+
 class ChannelTypes(IntFlag):
     """Hardware channel type flags."""
 

@@ -74,27 +74,48 @@ resp = client.comm.i2c("0.ESH10000597.I2C00", address=0x50,
 
 ```python
 client.comm.uart(device_name, action,
+                 port_name="", baud_rate=9600,
+                 bus_type=UartBusTypes.RS232,
+                 flow_control=FlowControlTypes.NONE,
+                 parity=ParityTypes.NONE,
+                 use_termination_byte=False, termination_byte=0x0A,
                  data_to_send=None, number_of_bytes_to_receive=0,
                  timeout_ms=1000)
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `device_name` | `str` | Device name as registered in the hardware manager |
-| `action` | `BusActions` | `SEND`, `RECEIVE`, `SEND_RECEIVE`, or `CLEAR_BUFFERS` |
-| `data_to_send` | `bytes` | Bytes to transmit |
-| `number_of_bytes_to_receive` | `int` | Expected receive count |
-| `timeout_ms` | `int` | Receive timeout in milliseconds (default 1000) |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `device_name` | `str` | — | Device name as registered in the hardware manager |
+| `action` | `BusActions` | — | `SEND`, `RECEIVE`, `SEND_RECEIVE`, or `CLEAR_BUFFERS` |
+| `port_name` | `str` | `""` | Serial port identifier (e.g. `"/dev/ttyS0"` or `"COM3"`) |
+| `baud_rate` | `int` | `9600` | Baud rate (e.g. `9600`, `115200`) |
+| `bus_type` | `UartBusTypes` | `RS232` | Electrical standard |
+| `flow_control` | `FlowControlTypes` | `NONE` | Flow control mode |
+| `parity` | `ParityTypes` | `NONE` | Parity setting |
+| `use_termination_byte` | `bool` | `False` | Whether to use `termination_byte` as a receive boundary |
+| `termination_byte` | `int` | `0x0A` | Termination byte value (0&ndash;255) |
+| `data_to_send` | `bytes` | `None` | Bytes to transmit (required for Send/SendReceive) |
+| `number_of_bytes_to_receive` | `int` | `0` | Expected receive count |
+| `timeout_ms` | `int` | `1000` | Receive timeout in milliseconds |
 
 ### Example
 
 ```python
-# Send a SCPI query and read the response
-resp = client.comm.uart("MyUartDevice",
-                        action=BusActions.SEND_RECEIVE,
-                        data_to_send=b"*IDN?\n",
-                        number_of_bytes_to_receive=64,
-                        timeout_ms=2000)
+from accordionq2.enums import BusActions, FlowControlTypes, ParityTypes, UartBusTypes
+
+# Send a SCPI query at 115200 baud and read the response
+resp = client.comm.uart(
+    "MyUartDevice",
+    action=BusActions.SEND_RECEIVE,
+    port_name="/dev/ttyS0",
+    baud_rate=115200,
+    bus_type=UartBusTypes.RS232,
+    parity=ParityTypes.NONE,
+    flow_control=FlowControlTypes.NONE,
+    data_to_send=b"*IDN?\n",
+    number_of_bytes_to_receive=64,
+    timeout_ms=2000,
+)
 print(resp.received.decode("ascii"))
 ```
 

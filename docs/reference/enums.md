@@ -116,42 +116,63 @@ if ch.channel_type & ChannelTypes.ANALOG:
 if ch.channel_type & (ChannelTypes.I2C | ChannelTypes.SPI):
     print("Bus channel")
 ```
-| `ANALOG` | 1 | Analog channel |
-| `DIGITAL` | 2 | Digital channel |
-| `VIRTUAL_DIGITAL` | 4 | Virtual digital channel |
-| `TEMPERATURE` | 8 | Temperature sensor |
-| `MULTIPLEXER` | 16 | Multiplexer channel |
-| `RESISTANCE` | 32 | Resistance measurement |
-| `COUNTER` | 64 | Counter channel |
-| `FREQUENCY` | 128 | Frequency measurement |
-| `ACTUATOR` | 256 | Actuator control |
-| `REGISTER` | 1024 | Register access |
-| `CURRENT` | 2048 | Current measurement |
-| `RATIOMETRIC` | 4096 | Ratiometric measurement |
-| `UART` | 8192 | UART communication |
-| `SPI` | 16384 | SPI communication |
-| `I2C` | 32768 | I2C communication |
-| `BYTE_STREAM` | 65536 | Byte stream |
-| `SOCKET` | 131072 | TCP socket |
-| `WAVEFORM` | 262144 | Waveform channel |
-| `NUMERIC_RESULT` | 524288 | Numeric result (single) |
-| `PSEUDO_DIGITAL` | 1048576 | Pseudo-digital channel |
-| `IMAGE` | 2097152 | Image channel |
-| `AUDIO` | 4194304 | Audio channel |
-| `VIDEO` | 8388608 | Video channel |
-| `INSTRUMENT` | 16777216 | Instrument channel |
-| `NUMERIC_RESULTS` | 33554432 | Numeric results (batch) |
-| `CALIBRATION` | 67108864 | Calibration channel |
 
-Supports bitwise operations:
+---
+
+## `UartBusTypes`
+
+UART electrical standard. Type: `str, Enum`. Mirrors `BusTransactionTypes.UartBusTypes`.
+
+| Value | Description |
+|-------|-------------|
+| `UNDEFINED` | Not defined |
+| `RS232` | Standard RS-232 full-duplex serial |
+| `RS422` | Differential RS-422 serial |
+| `RS485` | Multi-drop RS-485 serial |
+
+---
+
+## `FlowControlTypes`
+
+UART flow control mode. Type: `str, Enum`. Mirrors `BusTransactionTypes.FlowControlTypes`.
+
+| Value | Description |
+|-------|-------------|
+| `UNDEFINED` | Not defined |
+| `NONE` | No flow control |
+| `XON_XOFF` | Software (XON/XOFF) flow control |
+| `RTS_CTS` | Hardware RTS/CTS flow control |
+| `RTS_CTS_AND_XON_XOFF` | Hardware RTS/CTS combined with XON/XOFF |
+| `DTR_DSR` | Hardware DTR/DSR flow control |
+| `DTR_DSR_AND_XON_XOFF` | Hardware DTR/DSR combined with XON/XOFF |
+
+---
+
+## `ParityTypes`
+
+Serial port parity. Type: `str, Enum`. Mirrors `InstrumentTypes.ParityTypes`.
+
+| Value | Description |
+|-------|-------------|
+| `UNDEFINED` | Not defined / unknown |
+| `NONE` | No parity |
+| `EVEN` | Even parity |
+| `ODD` | Odd parity |
+| `MARK` | Mark parity |
+| `SPACE` | Space parity |
 
 ```python
-from accordionq2.enums import ChannelTypes
+from accordionq2.enums import FlowControlTypes, ParityTypes, UartBusTypes
 
-# Combine types
-combined = ChannelTypes.ANALOG | ChannelTypes.DIGITAL
-
-# Check if a channel is I2C
-if ch.channel_type & ChannelTypes.I2C:
-    print("I2C channel")
+resp = client.comm.uart(
+    "MyDevice",
+    action=BusActions.SEND_RECEIVE,
+    port_name="/dev/ttyS0",
+    baud_rate=115200,
+    bus_type=UartBusTypes.RS485,
+    flow_control=FlowControlTypes.NONE,
+    parity=ParityTypes.ODD,
+    data_to_send=b"\x01\x03",
+    number_of_bytes_to_receive=8,
+)
 ```
