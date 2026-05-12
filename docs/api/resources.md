@@ -2,6 +2,8 @@
 
 Resources represent readable/writable hardware values such as voltages, temperatures, and firmware revisions. They are identified by a dotted name string (e.g. `"TempRegulator.CPU_TEMP"`).
 
+> **Alias support:** Both the **NetName** (e.g. `"0.23.ESH10000517.READ_TEMPERATURE"`) and the channel **Alias** (e.g. `"FRONT_AIR READ TEMPERATURE"`) are accepted interchangeably by all read, write, and transact methods.
+
 ## Methods
 
 | Method | Returns | Description |

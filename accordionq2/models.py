@@ -312,3 +312,66 @@ class NumericMeasureResultDto:
             stopped=data.get("stopped", ""),
             duration=data.get("duration", ""),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class CalibrationChannelDto:
+    """Describes one Calibration channel."""
+
+    net_name: str = ""
+    alias: str = ""
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CalibrationChannelDto:
+        return cls(
+            net_name=data.get("netName", ""),
+            alias=data.get("alias", ""),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CalibrationRowDto:
+    """One row in a :class:`CalibrationTableDto`."""
+
+    key: str = ""
+    gain: float = 1.0
+    offset: float = 0.0
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CalibrationRowDto:
+        return cls(
+            key=data.get("key", ""),
+            gain=float(data.get("gain", 1.0)),
+            offset=float(data.get("offset", 0.0)),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"key": self.key, "gain": self.gain, "offset": self.offset}
+
+
+@dataclass(frozen=True, slots=True)
+class CalibrationTableDto:
+    """Decoded CalibrationTable exposed as a plain data object."""
+
+    product_id: str = ""
+    revision: str = ""
+    serial_number: str = ""
+    cal_data: tuple[CalibrationRowDto, ...] = field(default_factory=tuple)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CalibrationTableDto:
+        rows = [CalibrationRowDto.from_dict(r) for r in (data.get("calData") or [])]
+        return cls(
+            product_id=data.get("productId", ""),
+            revision=data.get("revision", ""),
+            serial_number=data.get("serialNumber", ""),
+            cal_data=tuple(rows),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ProductId": self.product_id,
+            "Revision": self.revision,
+            "SerialNumber": self.serial_number,
+            "CalData": [r.to_dict() for r in self.cal_data],
+        }

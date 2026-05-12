@@ -1,6 +1,6 @@
 # API Overview
 
-`AccordionQ2Client` exposes **eight operation groups**, each covering one area of the hardware API. All methods are **synchronous**, **thread-safe**, and raise `AccordionQ2ApiError` on HTTP errors. The entire library is fully annotated with PEP 484 type hints and passes `mypy --strict`.
+`AccordionQ2Client` exposes **nine operation groups**
 
 ```python
 from accordionq2 import AccordionQ2Client
@@ -14,6 +14,7 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
     client.media             # Media file management
     client.comm              # Raw bus transactions (I2C, UART, SPI, Socket)
     client.numeric_results   # Fast numeric sampling & statistics
+    client.calibration       # Calibration channel read/write
 ```
 
 | Group | Description | Details |
@@ -26,3 +27,4 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 | [`media`](media.md) | Upload/download media files | [→](media.md) |
 | [`comm`](comm.md) | Raw bus transactions (I2C, UART, SPI, Socket) | [→](comm.md) |
 | [`numeric_results`](numeric-results.md) | High-speed sampling with server-side statistics | [→](numeric-results.md) |
+| [`calibration`](calibration.md) | Read and write Calibration channel tables | [→](calibration.md) |

@@ -42,6 +42,7 @@ nav:
       - Media: api/media.md
       - Comm (Bus Transactions): api/comm.md
       - Numeric Results: api/numeric-results.md
+      - Calibration: api/calibration.md
   - Models & Enums:
       - Models: reference/models.md
       - Enumerations: reference/enums.md

@@ -117,6 +117,30 @@ Response models provide a `from_dict(data)` class method for deserialization; re
 | `stopped` | `str` | Acquisition stop timestamp |
 | `duration` | `str` | Acquisition duration |
 
+### `CalibrationChannelDto`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `net_name` | `str` | Hardware net name of the Calibration channel |
+| `alias` | `str` | Human-readable alias |
+
+### `CalibrationTableDto`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `product_id` | `str` | Product identifier |
+| `revision` | `str` | Hardware revision |
+| `serial_number` | `str` | Unit serial number |
+| `cal_data` | `tuple[CalibrationRowDto, ...]` | Calibration rows (immutable) |
+
+### `CalibrationRowDto`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `key` | `str` | Row identifier (e.g. channel name or composite field) |
+| `gain` | `float` | Gain correction factor |
+| `offset` | `float` | Offset correction value |
+
 ## Request Models
 
 ### `ChannelConfigRequest`
