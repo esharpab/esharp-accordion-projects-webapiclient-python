@@ -21,17 +21,26 @@ natural.
 
 ## Installation
 
-Install directly from a local checkout (editable mode recommended during
-development):
-
-```bash
-pip install -e .
-```
-
-Or install from [PyPI](https://pypi.org/project/accordionq2/):
+Install from [PyPI](https://pypi.org/project/accordionq2/):
 
 ```bash
 pip install accordionq2
+```
+
+### Using uv (recommended)
+
+```bash
+# Install the package
+uv add accordionq2
+
+# Or install from a local checkout with dev dependencies
+uv sync --dev
+```
+
+### pip (local checkout)
+
+```bash
+pip install -e .
 ```
 
 ## Quick Start
@@ -439,6 +448,16 @@ except AccordionQ2ApiError as e:
 ## Running the Tests
 
 The test suite uses [pytest](https://docs.pytest.org/).
+
+### Using uv (recommended)
+
+```bash
+# Install dev dependencies and run all unit tests
+uv sync --dev
+uv run pytest tests/unit/ -v
+```
+
+### Using pip
 
 ```bash
 # Install with test dependencies

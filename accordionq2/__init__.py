@@ -55,4 +55,10 @@ __all__ = [
     "PhysicalModuleDto",
     "PhysicalSystemDto",
 ]
-__version__ = "2.0.0"
+
+from importlib.metadata import PackageNotFoundError, version as _metadata_version
+
+try:
+    __version__ = _metadata_version("accordionq2")
+except PackageNotFoundError:
+    __version__ = "unknown"

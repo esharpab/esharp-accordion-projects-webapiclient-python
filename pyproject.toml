@@ -1,14 +1,15 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=69", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "accordionq2"
-version = "2.0.1"
+dynamic = ["version"]
 description = "Python client for the AccordionQ2 Hardware Management REST API"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {file = "LICENSE.md"}
+license = "LicenseRef-Proprietary"
+license-files = ["LICENSE.md"]
 authors = [{name = "eSharp AB"}]
 dependencies = []
 classifiers = [
@@ -20,7 +21,6 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
-    "License :: Other/Proprietary License",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Hardware",
@@ -33,13 +33,17 @@ PyPI = "https://pypi.org/project/accordionq2/"
 "NuGet (.NET)" = "https://www.nuget.org/packages/AccordionQ2.WebApiClient/"
 
 [project.optional-dependencies]
+docs = ["mkdocs-material>=9.0"]
+
+[dependency-groups]
 dev = [
     "pytest>=8",
     "ruff>=0.9",
     "mypy>=1.13",
     "pre-commit>=4",
 ]
-docs = ["mkdocs-material>=9.0"]
+
+[tool.setuptools_scm]
 
 [tool.setuptools.packages.find]
 include = ["accordionq2*"]
