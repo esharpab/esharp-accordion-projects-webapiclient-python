@@ -16,7 +16,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.11"
-      - run: uv sync --extra dev
+      - run: uv sync --group dev
       - run: uv run ruff check accordionq2 tests/unit
       - run: uv run ruff format --check accordionq2 tests/unit
 
@@ -28,7 +28,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.11"
-      - run: uv sync --extra dev
+      - run: uv sync --group dev
       - run: uv run mypy
 
   test:
@@ -44,7 +44,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv sync --extra dev
+      - run: uv sync --group dev
       - run: uv run pytest tests/unit -v
 
   publish:
