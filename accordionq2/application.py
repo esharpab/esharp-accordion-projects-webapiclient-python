@@ -72,6 +72,6 @@ class ApplicationGroup(ApiGroupBase):
 
         Pass ``tail=0`` to retrieve the entire log.
         """
-        result = self._get_json("api/application/log?tail={}".format(tail))
+        result = self._get_json(f"api/application/log?tail={tail}")
         assert isinstance(result, list)
         return result
