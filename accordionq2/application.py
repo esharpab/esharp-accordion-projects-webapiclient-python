@@ -66,3 +66,12 @@ class ApplicationGroup(ApiGroupBase):
     def delete_config_file(self, file_name: str) -> None:
         """Delete a configuration file from the device."""
         self._delete("api/application/config/{}".format(quote(file_name, safe="")))
+
+    def get_system_log(self, tail: int = 100) -> list[str]:
+        """Return the last *tail* lines of the system log (hw.log).
+
+        Pass ``tail=0`` to retrieve the entire log.
+        """
+        result = self._get_json("api/application/log?tail={}".format(tail))
+        assert isinstance(result, list)
+        return result

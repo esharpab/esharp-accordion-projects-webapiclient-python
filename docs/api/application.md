@@ -17,6 +17,7 @@ Application lifecycle management and configuration file operations.
 | `download_config_file(name)` | `bytes` | Download a config file as raw bytes. |
 | `upload_config_file(name, data)` | &mdash; | Upload a config file (bytes). |
 | `delete_config_file(name)` | &mdash; | Delete a config file from the device. |
+| `get_system_log(tail=100)` | `list[str]` | Last `tail` lines of the system log (hw.log). Pass `0` for the full log. |
 
 ## Examples
 
@@ -51,4 +52,18 @@ for f in client.application.list_config_files():
 print("Currently loaded:")
 for f in client.application.get_loaded_config_files():
     print(f"  {f}")
+```
+
+### Reading the System Log
+
+```python
+# Get the last 100 lines (default)
+for line in client.application.get_system_log():
+    print(line)
+
+# Get the last 200 lines
+recent = client.application.get_system_log(tail=200)
+
+# Get the entire log
+full = client.application.get_system_log(tail=0)
 ```

@@ -41,3 +41,16 @@ def test_get_loaded_config_files_returns_list(client):
     for f in files:
         print("  Loaded: {}".format(f))
     assert files is not None
+
+
+def test_get_system_log_returns_lines(client):
+    lines = client.application.get_system_log(tail=50)
+    print("System log lines returned: {}".format(len(lines)))
+    for line in lines[-5:]:
+        print("  {}".format(line))
+    assert isinstance(lines, list)
+
+
+def test_get_system_log_default_tail(client):
+    lines = client.application.get_system_log()
+    assert isinstance(lines, list)
