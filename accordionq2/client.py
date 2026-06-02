@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ._base import HttpSession
 from .application import ApplicationGroup
+from .audit import AuditGroup
 from .calibration import CalibrationGroup
 from .channels import ChannelsGroup
 from .comm import CommGroup
@@ -64,6 +65,7 @@ class AccordionQ2Client:
         self.comm = CommGroup(self._session)
         self.numeric_results = NumericResultsGroup(self._session)
         self.calibration = CalibrationGroup(self._session)
+        self.audit = AuditGroup(self._session)
 
     def __enter__(self) -> AccordionQ2Client:
         return self
