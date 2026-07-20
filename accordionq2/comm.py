@@ -6,6 +6,7 @@ from typing import Any
 
 from ._base import ApiGroupBase
 from .enums import BusActions, FlowControlTypes, ParityTypes, UartBusTypes
+from .exceptions import AccordionQ2ShortReadError
 from .models import BusTransactionResponse
 
 
@@ -21,6 +22,24 @@ def _action_value(action: BusActions | str) -> str:
     if isinstance(action, BusActions):
         return action.value
     return str(action)
+
+
+def _verify_read_length(
+    action: BusActions | str, requested: int, response: BusTransactionResponse
+) -> None:
+    """Raise if a clocked-bus read returned fewer bytes than requested.
+
+    Applies to I2C/SPI, where a short read is never legitimate and a "successful"
+    empty read signals an out-of-date agent. UART/Socket are timeout-bounded, so a
+    short read there is expected and left to the caller. Only Receive/SendReceive
+    carry a requested length -- Send and Scan are ignored.
+    """
+    if _action_value(action) not in (BusActions.RECEIVE.value, BusActions.SEND_RECEIVE.value):
+        return
+    if requested <= 0:
+        return
+    if response.number_of_bytes_received < requested:
+        raise AccordionQ2ShortReadError(requested, response.number_of_bytes_received)
 
 
 class CommGroup(ApiGroupBase):
@@ -100,7 +119,9 @@ class CommGroup(ApiGroupBase):
             body["DataToSend"] = encoded
         result = self._post_json("api/comm/i2c", body)
         assert isinstance(result, dict)
-        return BusTransactionResponse.from_dict(result)
+        response = BusTransactionResponse.from_dict(result)
+        _verify_read_length(action, number_of_bytes_to_receive, response)
+        return response
 
     def uart(
         self,
@@ -186,7 +207,9 @@ class CommGroup(ApiGroupBase):
             body["DataToSend"] = encoded
         result = self._post_json("api/comm/spi", body)
         assert isinstance(result, dict)
-        return BusTransactionResponse.from_dict(result)
+        response = BusTransactionResponse.from_dict(result)
+        _verify_read_length(action, number_of_bytes_to_receive, response)
+        return response
 
     def socket(
         self,

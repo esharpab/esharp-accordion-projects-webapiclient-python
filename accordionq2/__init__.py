@@ -9,7 +9,7 @@ from .enums import (
     ModuleStatus,
     MpioUsageTypes,
 )
-from .exceptions import AccordionQ2ApiError
+from .exceptions import AccordionQ2ApiError, AccordionQ2ShortReadError
 from .models import (
     AppLicenseDto,
     BusTransactionResponse,
@@ -32,6 +32,7 @@ __all__ = [
     "AccordionQ2ApiError",
     # Client
     "AccordionQ2Client",
+    "AccordionQ2ShortReadError",
     # Models - DTOs (read-only, frozen)
     "AppLicenseDto",
     # Enums

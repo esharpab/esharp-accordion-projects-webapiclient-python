@@ -11,7 +11,7 @@ from accordionq2._base import HttpSession
 from accordionq2.channels import ChannelsGroup
 from accordionq2.comm import CommGroup
 from accordionq2.enums import BusActions, FlowControlTypes, ParityTypes, UartBusTypes
-from accordionq2.exceptions import AccordionQ2ApiError
+from accordionq2.exceptions import AccordionQ2ApiError, AccordionQ2ShortReadError
 from accordionq2.models import BusTransactionResponse, ChannelConfigRequest, ChannelDto
 from accordionq2.resources import ResourcesGroup
 
@@ -235,3 +235,86 @@ class TestCommGroupUart:
             session.request.call_args[1].get("body") or session.request.call_args[0][2]
         )
         assert "DataToSend" not in body
+
+    def test_uart_short_read_is_tolerated(self):
+        # UART is timeout-bounded: a short read is normal and must NOT raise.
+        session = _session((200, _UART_RESPONSE))  # returns 4 bytes
+        grp = CommGroup(session)
+        resp = grp.uart("MyUart", BusActions.RECEIVE, number_of_bytes_to_receive=8)
+        assert resp.number_of_bytes_received == 4
+
+
+# ---------------------------------------------------------------------------
+# CommGroup - short-read guard (I2C/SPI)
+# ---------------------------------------------------------------------------
+
+
+def _i2c_response(received_hex: str, count: int) -> dict:
+    return {
+        "deviceName": "dev",
+        "action": "Receive",
+        "received": received_hex,
+        "numberOfBytesReceived": count,
+    }
+
+
+class TestCommGroupShortRead:
+    def test_i2c_receive_short_read_raises(self):
+        # Requested 1 byte, agent reports success with 0 -> loud failure.
+        session = _session((200, _i2c_response("", 0)))
+        grp = CommGroup(session)
+        with pytest.raises(AccordionQ2ShortReadError) as ei:
+            grp.i2c("dev", address=0x50, action=BusActions.RECEIVE, number_of_bytes_to_receive=1)
+        assert ei.value.requested_bytes == 1
+        assert ei.value.received_bytes == 0
+
+    def test_i2c_send_receive_short_read_raises(self):
+        session = _session((200, _i2c_response("4142", 2)))
+        grp = CommGroup(session)
+        with pytest.raises(AccordionQ2ShortReadError):
+            grp.i2c(
+                "dev",
+                address=0x50,
+                action=BusActions.SEND_RECEIVE,
+                data_to_send=b"\x00",
+                number_of_bytes_to_receive=4,
+            )
+
+    def test_i2c_full_read_ok(self):
+        session = _session((200, _i2c_response("41424344", 4)))
+        grp = CommGroup(session)
+        resp = grp.i2c("dev", address=0x50, action=BusActions.RECEIVE, number_of_bytes_to_receive=4)
+        assert resp.received == b"ABCD"
+
+    def test_i2c_scan_not_treated_as_short_read(self):
+        # Scan carries no requested length; its returned bytes are the address list.
+        session = _session(
+            (
+                200,
+                {
+                    "deviceName": "dev",
+                    "action": "Scan",
+                    "received": "20505770",
+                    "numberOfBytesReceived": 4,
+                },
+            )
+        )
+        grp = CommGroup(session)
+        resp = grp.i2c("dev", address=0x00, action=BusActions.SCAN)
+        assert resp.number_of_bytes_received == 4
+
+    def test_spi_receive_short_read_raises(self):
+        session = _session(
+            (
+                200,
+                {
+                    "deviceName": "dev",
+                    "action": "Receive",
+                    "received": "",
+                    "numberOfBytesReceived": 0,
+                },
+            )
+        )
+        grp = CommGroup(session)
+        with pytest.raises(AccordionQ2ShortReadError):
+            grp.spi("dev", action=BusActions.RECEIVE, number_of_bytes_to_receive=2)
