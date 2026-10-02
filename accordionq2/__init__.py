@@ -9,6 +9,7 @@ from .enums import (
     ModuleStatus,
     MpioUsageTypes,
 )
+from .events import EventStream, ServerEvent
 from .exceptions import AccordionQ2ApiError, AccordionQ2ShortReadError
 from .models import (
     AppLicenseDto,
@@ -27,6 +28,7 @@ from .models import (
     PhysicalModuleDto,
     PhysicalSystemDto,
 )
+from .subscriptions import SubscriptionDto
 
 __all__ = [
     # Exceptions
@@ -49,6 +51,7 @@ __all__ = [
     "ChannelTypes",
     "ConnectionStatusDto",
     "DirectionTypes",
+    "EventStream",
     "InstrumentDto",
     "ModuleSettingsDto",
     "ModuleStatus",
@@ -57,6 +60,8 @@ __all__ = [
     "NumericResultChannelDto",
     "PhysicalModuleDto",
     "PhysicalSystemDto",
+    "ServerEvent",
+    "SubscriptionDto",
 ]
 
 from importlib.metadata import PackageNotFoundError

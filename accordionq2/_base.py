@@ -93,6 +93,30 @@ class HttpSession:
             return ssl.create_default_context(cafile=self._verify)
         return ssl.create_default_context()
 
+    @property
+    def default_headers(self) -> dict[str, str]:
+        """Headers sent with every request (auth, API keys)."""
+        return dict(self._default_headers)
+
+    def full_path(self, path: str) -> str:
+        """*path* under the base URL's path."""
+        return "{}/{}".format(self._path_prefix, path.lstrip("/"))
+
+    def new_connection(self, timeout: float | None = None) -> http.client.HTTPConnection:
+        """A connection of its own, for a long-lived response such as the event stream.
+
+        It isn't the shared connection, so ordinary requests aren't held up by it.
+        """
+        t = self._timeout if timeout is None else timeout
+        if self._scheme == "https":
+            return http.client.HTTPSConnection(
+                self._host,  # type: ignore[arg-type]
+                self._port,
+                timeout=t,
+                context=self._build_ssl_context(),
+            )
+        return http.client.HTTPConnection(self._host, self._port, timeout=t)  # type: ignore[arg-type]
+
     def _connect(self) -> None:
         self._last_used = time.monotonic()
         if self._scheme == "https":
@@ -183,6 +207,10 @@ class ApiGroupBase:
     def _post_json(self, path: str, body: object = None) -> object:
         """Send POST and return parsed JSON response."""
         return json.loads(self._request("POST", path, body=body))
+
+    def _put_json(self, path: str, body: object = None) -> object:
+        """Send PUT and return parsed JSON response."""
+        return json.loads(self._request("PUT", path, body=body))
 
     def _post_multipart(self, path: str, filename: str, data: bytes) -> None:
         """Send POST with multipart/form-data file upload."""

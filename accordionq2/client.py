@@ -9,11 +9,13 @@ from .calibration import CalibrationGroup
 from .channels import ChannelsGroup
 from .comm import CommGroup
 from .connection import ConnectionGroup
+from .events import EventsGroup
 from .instruments import InstrumentsGroup
 from .media import MediaGroup
 from .modules import ModulesGroup
 from .numeric_results import NumericResultsGroup
 from .resources import ResourcesGroup
+from .subscriptions import SubscriptionsGroup
 
 
 class AccordionQ2Client:
@@ -68,6 +70,8 @@ class AccordionQ2Client:
         self.calibration = CalibrationGroup(self._session)
         self.audit = AuditGroup(self._session)
         self.instruments = InstrumentsGroup(self._session)
+        self.events = EventsGroup(self._session)
+        self.subscriptions = SubscriptionsGroup(self._session)
 
     def __enter__(self) -> AccordionQ2Client:
         return self

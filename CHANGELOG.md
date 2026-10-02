@@ -21,6 +21,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The event stream and value subscriptions (accordionq2 contract sections 4 and 5.3):
+  `client.events.open()` (an `EventStream` with `stream_id`, on a connection of its own, with
+  the 30 s silence limit) and `client.subscriptions.create/update/delete`.
+- Reads with a maximum age (contract section 5.2): `resources.get_values(names, max_age_ms=…)`
+  and `resources.read_values(...)`, which also returns each value's age.
 - `client.instruments.get_all()` returns the station's instruments (`InstrumentDto`: type,
   group, and the function map naming the channel behind each capability).
 - `ChannelDto.details`: the fields of the channel's own type (gain, input configuration,

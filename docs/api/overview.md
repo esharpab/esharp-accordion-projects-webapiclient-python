@@ -16,6 +16,8 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
     client.numeric_results   # Fast numeric sampling & statistics
     client.calibration       # Calibration channel read/write
     client.instruments       # Instruments (power supplies) and their function maps
+    client.events            # Event stream: connection, configuration and values events
+    client.subscriptions     # Value subscriptions delivered on the event stream
 ```
 
 | Group | Description | Details |
@@ -29,4 +31,5 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 | [`comm`](comm.md) | Raw bus transactions (I2C, UART, SPI, Socket) | [→](comm.md) |
 | [`numeric_results`](numeric-results.md) | High-speed sampling with server-side statistics | [→](numeric-results.md) |
 | [`calibration`](calibration.md) | Read and write Calibration channel tables | [→](calibration.md) |
+| [`events`, `subscriptions`](events.md) | Event stream and value subscriptions | [→](events.md) |
 | [`instruments`](instruments.md) | Instruments such as power-supply outputs, with the channel behind each capability | [→](instruments.md) |

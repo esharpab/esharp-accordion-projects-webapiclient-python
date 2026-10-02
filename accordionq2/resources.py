@@ -45,14 +45,30 @@ class ResourcesGroup(ApiGroupBase):
         """Set the value of a single resource."""
         self._post("api/resources/value/set", {"Name": name, "Value": value})
 
-    def get_values(self, names: list[str]) -> dict[str, str]:
+    def get_values(self, names: list[str], max_age_ms: int = 0) -> dict[str, str]:
         """Read values for multiple resources in one round-trip.
 
         Returns a dict mapping each resource name to its current value string.
+        With *max_age_ms*, values the WebApi read at most that long ago are
+        returned from its cache (accordionq2 contract section 5.2); 0 reads
+        every one from the hardware.
         """
-        result = self._post_json("api/resources/values/get", {"Names": names})
+        return self.read_values(names, max_age_ms)[0]
+
+    def read_values(
+        self, names: list[str], max_age_ms: int = 0
+    ) -> tuple[dict[str, str], dict[str, float]]:
+        """Like :meth:`get_values`, and also how old each value is in ms (0 when just read).
+
+        A WebApi without the cache reads every value and reports no ages.
+        """
+        body: dict[str, object] = {"Names": names}
+        if max_age_ms:
+            body["MaxAgeMs"] = max_age_ms
+        result = self._post_json("api/resources/values/get", body)
         assert isinstance(result, dict)
-        return cast(dict[str, str], result["resources"])
+        ages = result.get("ageMs") or {}
+        return cast(dict[str, str], result["resources"]), {k: float(v) for k, v in ages.items()}
 
     def set_values(self, resources: dict[str, str]) -> None:
         """Set values for multiple resources in one round-trip.

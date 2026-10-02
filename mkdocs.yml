@@ -44,6 +44,7 @@ nav:
       - Numeric Results: api/numeric-results.md
       - Calibration: api/calibration.md
       - Instruments: api/instruments.md
+      - Events and subscriptions: api/events.md
   - Models & Enums:
       - Models: reference/models.md
       - Enumerations: reference/enums.md
