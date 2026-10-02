@@ -43,6 +43,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A failed request is no longer sent again when that could run it twice on the station.**
+  `HttpSession` used to resend any request once after any error, including a timeout after
+  the WebApi had already received it, so a value write, bus transaction or EEPROM command
+  could run twice. Now GET, HEAD and OPTIONS are retried on any error; every other request
+  only when sending failed on a reused connection (it never reached the server). The reads
+  sent as POST count as "every other", because reading a byte stream consumes it. A
+  timeout or a dropped connection after sending raises, and the caller decides.
+  Connections idle for over `IDLE_REOPEN_SECONDS` (60 s; the WebApi closes them after
+  120 s) are reopened before use, so the stale-connection case stays rare.
 - **`@dataclass` misuse in six model classes** (`ConnectionStatusDto`, `AppLicenseDto`,
   `ModuleSettingsDto`, `PhysicalModuleDto`, `PhysicalSystemDto`, `ChannelDto`): bare
   class-level assignments replaced with annotated field declarations; hand-written

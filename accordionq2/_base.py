@@ -12,18 +12,35 @@ import http.client
 import json
 import ssl
 import threading
+import time
 import uuid
 from urllib.parse import urlparse
 
 from .exceptions import AccordionQ2ApiError
+
+# Methods that may be sent twice: they don't change anything on the station.
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+# The WebApi (Kestrel) closes a keep-alive connection after two minutes idle. Reopening well before
+# that means a request is almost never sent on a connection the server has just closed.
+IDLE_REOPEN_SECONDS = 60.0
 
 
 class HttpSession:
     """Persistent HTTP(S) connection that reuses a single TCP socket.
 
     The socket stays open across requests so the hostname is resolved only
-    once.  If the connection is dropped by the server the next request
-    will automatically reconnect (one retry).
+    once.  A connection idle for longer than ``IDLE_REOPEN_SECONDS`` is
+    reopened before use, since the server may have closed it.
+
+    Retries: a failed request is sent again once only when that can't run it
+    twice on the station.  GET, HEAD and OPTIONS are retried on any failure.
+    Everything else (value writes, bus transactions, and also the reads sent
+    as POST, since reading a byte stream consumes it) is retried only when
+    sending failed on a reused connection, so the request never reached the
+    server.  A timeout or a dropped connection after sending raises instead:
+    the station may have acted on the request, and only the caller knows
+    whether doing it again is safe.
 
     Thread safety: a ``threading.Lock`` serialises all requests through this
     session.  For true request parallelism use one client per thread.
@@ -56,6 +73,7 @@ class HttpSession:
         self._timeout = timeout
         self._verify = verify
         self._conn: http.client.HTTPConnection | None = None
+        self._last_used: float | None = None
         self._lock = threading.Lock()
 
         self._default_headers: dict[str, str] = dict(default_headers or {})
@@ -76,6 +94,7 @@ class HttpSession:
         return ssl.create_default_context()
 
     def _connect(self) -> None:
+        self._last_used = time.monotonic()
         if self._scheme == "https":
             self._conn = http.client.HTTPSConnection(
                 self._host,  # type: ignore[arg-type]
@@ -101,17 +120,31 @@ class HttpSession:
         # Avoid double slashes when path_prefix is empty or path starts with /
         full_path = "{}/{}".format(self._path_prefix, path.lstrip("/"))
         merged = {**self._default_headers, **(headers or {})}
+        safe = method.upper() in _SAFE_METHODS
         with self._lock:
+            if (
+                self._conn is not None
+                and self._last_used is not None
+                and time.monotonic() - self._last_used > IDLE_REOPEN_SECONDS
+            ):
+                self._close_conn()
             for attempt in range(2):
+                reused = self._conn is not None
+                sent = False
                 try:
                     if self._conn is None:
                         self._connect()
                     self._conn.request(method, full_path, body=body, headers=merged)  # type: ignore[union-attr]
+                    sent = True
                     resp = self._conn.getresponse()  # type: ignore[union-attr]
-                    return resp.status, resp.read()
-                except (http.client.HTTPException, OSError):
+                    data = resp.read()
+                    self._last_used = time.monotonic()
+                    return resp.status, data
+                except (http.client.HTTPException, OSError) as error:
                     self._close_conn()
-                    if attempt > 0:
+                    # A timeout while sending may still have delivered the request.
+                    undelivered = reused and not sent and not isinstance(error, TimeoutError)
+                    if attempt > 0 or not (safe or undelivered):
                         raise
         raise http.client.HTTPException("request failed after retry")
 

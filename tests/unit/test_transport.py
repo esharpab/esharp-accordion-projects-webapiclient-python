@@ -205,3 +205,95 @@ class TestMultipartUpload:
         )
         # RFC 5987 encoding: spaces become %20
         assert b"%20" in body_sent or b"my%20file" in body_sent
+
+
+# ---------------------------------------------------------------------------
+# HttpSession - retries never run a request twice on the station (P0-PY-01)
+# ---------------------------------------------------------------------------
+
+
+def _session_with(
+    first: MagicMock, second: MagicMock | None = None
+) -> tuple[HttpSession, MagicMock]:
+    """A session on a reused connection *first*; a reconnect gets *second*."""
+    session = HttpSession("http://localhost:5000", timeout=5.0)
+    session._conn = first
+    replacement = second or MagicMock()
+    if second is None:
+        replacement.getresponse.return_value = _make_response(200, b'"ok"')
+
+    def connect() -> None:
+        session._conn = replacement
+        session._last_used = None
+
+    connect_mock = MagicMock(side_effect=connect)
+    session._connect = connect_mock  # type: ignore[method-assign]
+    return session, connect_mock
+
+
+class TestRetries:
+    def test_post_timeout_after_sending_is_not_retried(self):
+        conn = MagicMock()
+        conn.getresponse.side_effect = TimeoutError("timed out")
+        session, connect = _session_with(conn)
+        with pytest.raises(TimeoutError):
+            session.request("POST", "api/resources/value/set", body=b"{}")
+        assert conn.request.call_count == 1
+        connect.assert_not_called()
+
+    def test_post_dropped_after_sending_is_not_retried(self):
+        import http.client
+
+        conn = MagicMock()
+        conn.getresponse.side_effect = http.client.RemoteDisconnected("closed")
+        session, connect = _session_with(conn)
+        with pytest.raises(http.client.RemoteDisconnected):
+            session.request("POST", "api/resources/transact", body=b"{}")
+        connect.assert_not_called()
+
+    def test_post_that_could_not_be_sent_on_a_stale_connection_is_retried(self):
+        stale = MagicMock()
+        stale.request.side_effect = BrokenPipeError("broken pipe")
+        session, connect = _session_with(stale)
+        status, _ = session.request("POST", "api/resources/value/set", body=b"{}")
+        assert status == 200
+        connect.assert_called_once()
+        assert session._conn.request.call_count == 1
+
+    def test_post_timeout_while_sending_is_not_retried(self):
+        conn = MagicMock()
+        conn.request.side_effect = TimeoutError("timed out")
+        session, connect = _session_with(conn)
+        with pytest.raises(TimeoutError):
+            session.request("POST", "api/resources/value/set", body=b"{}")
+        connect.assert_not_called()
+
+    def test_post_failing_on_a_fresh_connection_is_not_retried(self):
+        fresh = MagicMock()
+        fresh.request.side_effect = ConnectionRefusedError("refused")
+        session, connect = _session_with(MagicMock(), fresh)
+        session._conn = None
+        with pytest.raises(ConnectionRefusedError):
+            session.request("POST", "api/resources/value/set", body=b"{}")
+        connect.assert_called_once()
+
+    def test_get_timeout_is_retried(self):
+        conn = MagicMock()
+        conn.getresponse.side_effect = TimeoutError("timed out")
+        session, connect = _session_with(conn)
+        status, _ = session.request("GET", "api/channels")
+        assert status == 200
+        connect.assert_called_once()
+
+    def test_an_idle_connection_is_reopened_before_use(self):
+        import time
+
+        from accordionq2._base import IDLE_REOPEN_SECONDS
+
+        idle = MagicMock()
+        session, connect = _session_with(idle)
+        session._last_used = time.monotonic() - IDLE_REOPEN_SECONDS - 1
+        session.request("POST", "api/resources/value/set", body=b"{}")
+        idle.close.assert_called_once()
+        idle.request.assert_not_called()
+        connect.assert_called_once()
