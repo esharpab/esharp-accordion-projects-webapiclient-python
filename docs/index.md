@@ -37,9 +37,10 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 
 ## API Reference
 
-- [Overview](api/overview.md) &mdash; all 8 API groups at a glance
+- [Overview](api/overview.md) &mdash; all the API groups at a glance
 - [Resources](api/resources.md), [Channels](api/channels.md), [Modules](api/modules.md), [Application](api/application.md), [Media](api/media.md), [Connection](api/connection.md)
 - [Calibration](api/calibration.md) &mdash; calibration operations
+- [Instruments](api/instruments.md) &mdash; power-supply outputs and their function maps
 - [Comm (Bus Transactions)](api/comm.md) &mdash; I2C, UART, SPI, Socket
 - [Numeric Results](api/numeric-results.md) &mdash; high-speed sampling
 

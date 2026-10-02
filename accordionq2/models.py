@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any
 
 from .enums import (
@@ -160,6 +162,11 @@ class ChannelDto:
     default_direction: DirectionTypes = DirectionTypes.UNDEFINED
     unit: str = ""
     is_virtual: bool = False
+    #: The fields of the channel's own type (contract section 7), keyed as the WebApi sends
+    #: them: ``{"gain": 1.0, "inputConfiguration": "RSE", ...}``. ``None`` when the type has
+    #: none or the firmware predates them. Enums are strings, default values are strings in
+    #: the resource-value format ("True", "1.25").
+    details: Mapping[str, Any] | None = field(default=None, hash=False)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ChannelDto:
@@ -186,6 +193,9 @@ class ChannelDto:
             default_direction=parse_direction_types(data.get("defaultDirection", 0)),
             unit=data.get("unit", ""),
             is_virtual=data.get("isVirtual", False),
+            details=MappingProxyType(dict(raw))
+            if isinstance(raw := data.get("details"), dict)
+            else None,
         )
 
 
@@ -220,6 +230,10 @@ class ChannelConfigRequest:
     unit: str | None = None
     group_name: str | None = None
     device_name: str | None = None
+    #: Type-specific fields to change (contract section 7), with the contract's keys, e.g.
+    #: ``{"gain": 2.0}`` or ``{"pullType": "Up"}``. The WebApi refuses a key the channel's
+    #: type can't configure, or a bad value, with a 400 naming it.
+    details: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {}
@@ -239,7 +253,43 @@ class ChannelConfigRequest:
             result["GroupName"] = self.group_name
         if self.device_name is not None:
             result["DeviceName"] = self.device_name
+        if self.details is not None:
+            result["Details"] = dict(self.details)
         return result
+
+
+@dataclass(frozen=True, slots=True)
+class InstrumentDto:
+    """An Instrument channel with its type and function map (``GET /api/instruments``).
+
+    The function map names the channel behind each of the instrument's capabilities, for
+    example ``OUTPUT_VOLTAGE`` -> ``0.4.ESH10000662.VSET1``. Every key is optional.
+    """
+
+    net_name: str = ""
+    alias: str = ""
+    #: E.g. "CH1" for one output of a two-output supply.
+    group_name: str = ""
+    description: str = ""
+    #: Several outputs of one module can share it.
+    instrument_name: str = ""
+    #: The instrument type, e.g. "PowerSupply".
+    type: str = ""
+    function_map: Mapping[str, str] = field(
+        default_factory=lambda: MappingProxyType({}), hash=False
+    )
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> InstrumentDto:
+        return cls(
+            net_name=data.get("netName", ""),
+            alias=data.get("alias", ""),
+            group_name=data.get("groupName", ""),
+            description=data.get("description", ""),
+            instrument_name=data.get("instrumentName", ""),
+            type=data.get("type", ""),
+            function_map=MappingProxyType(dict(data.get("functionMap") or {})),
+        )
 
 
 @dataclass(frozen=True, slots=True)

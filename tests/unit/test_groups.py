@@ -318,3 +318,63 @@ class TestCommGroupShortRead:
         grp = CommGroup(session)
         with pytest.raises(AccordionQ2ShortReadError):
             grp.spi("dev", action=BusActions.RECEIVE, number_of_bytes_to_receive=2)
+
+
+# ---------------------------------------------------------------------------
+# Channel details and instruments (accordionq2 contract sections 6 and 7)
+# ---------------------------------------------------------------------------
+
+
+class TestChannelDetails:
+    def test_details_are_kept_as_sent(self):
+        data = {**_CHANNEL_DATA, "details": {"gain": 2.5, "inputConfiguration": "RSE"}}
+        dto = ChannelDto.from_dict(data)
+        assert dto.details is not None
+        assert dto.details["gain"] == 2.5
+        assert dto.details["inputConfiguration"] == "RSE"
+
+    def test_details_are_read_only(self):
+        dto = ChannelDto.from_dict({**_CHANNEL_DATA, "details": {"gain": 1.0}})
+        with pytest.raises(TypeError):
+            dto.details["gain"] = 2.0  # type: ignore[index]
+
+    def test_no_details_is_none(self):
+        assert ChannelDto.from_dict(_CHANNEL_DATA).details is None
+
+    def test_a_channel_with_details_is_still_hashable(self):
+        dto = ChannelDto.from_dict({**_CHANNEL_DATA, "details": {"gain": 1.0}})
+        assert hash(dto) == hash(dto)
+
+    def test_configure_sends_details(self):
+        session = _session((200, {"message": "ok"}))
+        ChannelsGroup(session).configure(
+            ChannelConfigRequest(net_name="0.1.X.V", details={"gain": 2.0})
+        )
+        body = json.loads(session.request.call_args.kwargs["body"])
+        assert body == {"NetName": "0.1.X.V", "Details": {"gain": 2.0}}
+
+
+class TestInstrumentsGroup:
+    def test_get_all_parses_function_map(self):
+        from accordionq2.instruments import InstrumentsGroup
+
+        session = _session(
+            (
+                200,
+                [
+                    {
+                        "netName": "0.4.ESH10000662.Mini PSU_CH1",
+                        "alias": "Mini PSU_CH1",
+                        "groupName": "CH1",
+                        "description": "",
+                        "instrumentName": "Mini PSU",
+                        "type": "PowerSupply",
+                        "functionMap": {"OUTPUT_VOLTAGE": "0.4.ESH10000662.VSET1"},
+                    }
+                ],
+            )
+        )
+        instruments = InstrumentsGroup(session).get_all()
+        assert session.request.call_args.args[:2] == ("GET", "api/instruments")
+        assert instruments[0].type == "PowerSupply"
+        assert instruments[0].function_map["OUTPUT_VOLTAGE"] == "0.4.ESH10000662.VSET1"

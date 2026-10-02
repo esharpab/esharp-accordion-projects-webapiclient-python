@@ -21,6 +21,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `client.instruments.get_all()` returns the station's instruments (`InstrumentDto`: type,
+  group, and the function map naming the channel behind each capability).
+- `ChannelDto.details`: the fields of the channel's own type (gain, input configuration,
+  push/pull, a multiplexer's destination nets, ...), read-only, keyed as the WebApi sends them.
+- `ChannelConfigRequest.details` changes those fields, e.g. `details={"gain": 2.0}`.
 - `AccordionQ2Client` now accepts optional parameters:
   - `auth: tuple[str, str]` — HTTP Basic Auth credentials.
   - `verify: bool | str` — TLS certificate verification (`True` = system CA bundle,

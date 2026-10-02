@@ -38,9 +38,7 @@ Response models provide a `from_dict(data)` class method for deserialization; re
 | `default_direction` | `DirectionTypes` | Factory-default direction |
 | `unit` | `str` | Unit of measurement |
 | `is_virtual` | `bool` | Whether this is a virtual channel |
-| `device_name` | `str` | Name of the providing device |
-| `usage_type` | `MpioUsageTypes` | Usage classification |
-| ... | ... | Additional fields |
+| `details` | `Mapping[str, Any] \| None` | Read-only fields of the channel's own type, keyed as the WebApi sends them (`"gain"`, `"pullType"`, `"destinationNets"`, ...). `None` for types without any, or older firmware |
 
 ### `ModuleSettingsDto`
 
@@ -146,6 +144,24 @@ Response models provide a `from_dict(data)` class method for deserialization; re
 ### `ChannelConfigRequest`
 
 Partial-update request &mdash; only non-`None` fields are applied. See [Channels](../api/channels.md) for usage.
+
+`details` (`dict[str, Any] | None`) changes fields of the channel's own type, with the same keys as `ChannelDto.details`, e.g. `{"gain": 2.0}` or `{"pullType": "Up"}`. A key the type can't configure, or a bad value, is refused with an `AccordionQ2ApiError` (400) naming it.
+
+```python
+client.channels.configure(ChannelConfigRequest(net_name="0.2.ESH10000560.MEAS2_VPP", details={"gain": 2.0}))
+```
+
+### `InstrumentDto`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `net_name` | `str` | Net name of the Instrument channel |
+| `alias` | `str` | Alias of the Instrument channel |
+| `group_name` | `str` | Group, e.g. `"CH1"` for one output of a two-output supply |
+| `description` | `str` | Description |
+| `instrument_name` | `str` | Instrument name; several outputs of one module share it |
+| `type` | `str` | Instrument type, e.g. `"PowerSupply"` |
+| `function_map` | `Mapping[str, str]` | Capability (`OUTPUT_VOLTAGE`, `OUTPUT_ENABLE`, ...) to the net name of the channel behind it |
 
 ### `ChannelLookupRequest`
 

@@ -1,6 +1,6 @@
 # Audit
 
-WebApi request audit log — records the IP address, HTTP method, path, response status, and duration of every request handled by the server.
+WebApi request audit log — records the IP address, HTTP method, path, response status, and duration of the requests that change something. Reads (GET, and the value and channel reads sent as POST) are left out.
 
 ## Methods
 
