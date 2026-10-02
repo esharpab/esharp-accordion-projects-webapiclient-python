@@ -11,6 +11,7 @@ from .comm import CommGroup
 from .connection import ConnectionGroup
 from .events import EventsGroup
 from .instruments import InstrumentsGroup
+from .lease import LeaseGroup
 from .media import MediaGroup
 from .modules import ModulesGroup
 from .numeric_results import NumericResultsGroup
@@ -72,6 +73,7 @@ class AccordionQ2Client:
         self.instruments = InstrumentsGroup(self._session)
         self.events = EventsGroup(self._session)
         self.subscriptions = SubscriptionsGroup(self._session)
+        self.lease = LeaseGroup(self._session)
 
     def __enter__(self) -> AccordionQ2Client:
         return self

@@ -21,6 +21,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The control lease (accordionq2 contract section 5.5): `client.lease.get/acquire/renew/release`,
+  and `with client.lease.hold(owner):`, which renews in the background and releases after the
+  block. The holder's requests carry `X-Lease-Id`; other clients' changes raise 423.
 - The event stream and value subscriptions (accordionq2 contract sections 4 and 5.3):
   `client.events.open()` (an `EventStream` with `stream_id`, on a connection of its own, with
   the 30 s silence limit) and `client.subscriptions.create/update/delete`.

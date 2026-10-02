@@ -11,6 +11,7 @@ from .enums import (
 )
 from .events import EventStream, ServerEvent
 from .exceptions import AccordionQ2ApiError, AccordionQ2ShortReadError
+from .lease import LeaseDto
 from .models import (
     AppLicenseDto,
     BusTransactionResponse,
@@ -53,6 +54,7 @@ __all__ = [
     "DirectionTypes",
     "EventStream",
     "InstrumentDto",
+    "LeaseDto",
     "ModuleSettingsDto",
     "ModuleStatus",
     "MpioUsageTypes",

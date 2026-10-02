@@ -34,3 +34,14 @@ with client.events.open() as events:
 ## Reads with a maximum age
 
 `resources.get_values(names, max_age_ms=1000)` accepts values the WebApi read at most that long ago (by any client) and reads only the rest; `resources.read_values(...)` also returns how old each value is. Without `max_age_ms` every value is read from the hardware, as before.
+
+## The control lease
+
+One client at a time may change the station. While someone else holds it, writes and forced reads raise `AccordionQ2ApiError` with status 423; reads with `max_age_ms` and subscriptions keep working.
+
+```python
+with client.lease.hold("TAT station 3", ttl_ms=30000):
+    client.resources.set_value("0.4.ESH10000662.VSET1", "5")
+```
+
+`hold` renews the lease every third of `ttl_ms` and releases it when the block ends, also on an exception. `client.lease.get()` says who holds it.

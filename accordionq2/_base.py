@@ -98,6 +98,14 @@ class HttpSession:
         """Headers sent with every request (auth, API keys)."""
         return dict(self._default_headers)
 
+    def set_default_header(self, name: str, value: str | None) -> None:
+        """Send *name* with every request from now on; None stops sending it (the lease id)."""
+        with self._lock:
+            if value is None:
+                self._default_headers.pop(name, None)
+            else:
+                self._default_headers[name] = value
+
     def full_path(self, path: str) -> str:
         """*path* under the base URL's path."""
         return "{}/{}".format(self._path_prefix, path.lstrip("/"))
