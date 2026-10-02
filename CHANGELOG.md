@@ -21,6 +21,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `numeric_results.acquire(channel, target, samples, lsl=, usl=)`: the samples and their
+  statistics in one call (accordionq2 contract section 8), as a `NumericAcquisition`.
 - The control lease (accordionq2 contract section 5.5): `client.lease.get/acquire/renew/release`,
   and `with client.lease.hold(owner):`, which renews in the background and releases after the
   block. The holder's requests carry `X-Lease-Id`; other clients' changes raise 423.

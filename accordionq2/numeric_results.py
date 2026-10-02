@@ -2,10 +2,35 @@
 
 from __future__ import annotations
 
+import base64
+import struct
+from dataclasses import dataclass, field
+from typing import Any
 from urllib.parse import quote as _quote
 
 from ._base import ApiGroupBase
 from .models import NumericMeasureResultDto, NumericResultChannelDto
+
+
+@dataclass(frozen=True, slots=True)
+class NumericAcquisition:
+    """One acquisition: the samples and their statistics.
+
+    A statistic the samples can't give is ``None``.
+    """
+
+    channel: str
+    target: str
+    #: The target channel's unit.
+    unit: str
+    #: The sample rate the hardware reported, in Hz.
+    sample_rate: int
+    started: str
+    duration_ms: float | None
+    samples: tuple[float, ...] = field(hash=False)
+    #: ``count``, ``min``, ``max``, ``range``, ``mean``, ``median``, ``stdev``, ``rms``,
+    #: ``skewness``, ``kurtosis``, and ``cp``/``cpk`` with limits.
+    stats: dict[str, Any] = field(default_factory=dict, hash=False)
 
 
 class NumericResultsGroup(ApiGroupBase):
@@ -27,6 +52,40 @@ class NumericResultsGroup(ApiGroupBase):
         mean  = client.numeric_results.get_mean(channels[0].net_name)
         stdev = client.numeric_results.get_stdev(channels[0].net_name)
     """
+
+    def acquire(
+        self,
+        channel: str,
+        target: str,
+        samples: int = 1000,
+        lsl: float | None = None,
+        usl: float | None = None,
+    ) -> NumericAcquisition:
+        """Acquire *samples* on *target* and return them with their statistics in one call.
+
+        (accordionq2 contract section 8.) With both limits, ``cp`` and ``cpk``
+        are in the statistics. It reconfigures the channel, so it needs the
+        lease while someone else holds it.
+        """
+        body: dict[str, object] = {"Channel": channel, "Target": target, "Samples": samples}
+        if lsl is not None:
+            body["Lsl"] = lsl
+        if usl is not None:
+            body["Usl"] = usl
+        result = self._post_json("api/numeric-results/acquire", body)
+        assert isinstance(result, dict)
+        raw = base64.b64decode(result.get("samples") or "")
+        values = struct.unpack(f"<{len(raw) // 8}d", raw)
+        return NumericAcquisition(
+            channel=result.get("channel", ""),
+            target=result.get("target", ""),
+            unit=result.get("unit", ""),
+            sample_rate=int(result.get("sampleRate", 0)),
+            started=result.get("started", ""),
+            duration_ms=result.get("durationMs"),
+            samples=values,
+            stats=dict(result.get("stats") or {}),
+        )
 
     def get_channels(self) -> list[NumericResultChannelDto]:
         """Return all NumericResult channels with their sampling capabilities."""
