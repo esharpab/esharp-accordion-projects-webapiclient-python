@@ -45,6 +45,11 @@ nav:
       - Calibration: api/calibration.md
       - Instruments: api/instruments.md
       - Events and subscriptions: api/events.md
+      - Lease: api/lease.md
+      - System and boot.config: api/system.md
+      - Files: api/files.md
+      - Firmware: api/firmware.md
+      - Audit: api/audit.md
   - Models & Enums:
       - Models: reference/models.md
       - Enumerations: reference/enums.md

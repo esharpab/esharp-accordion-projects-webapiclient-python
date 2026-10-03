@@ -100,8 +100,11 @@ client = AccordionQ2Client("http://device.local:5000",
 
 ## API Reference
 
-The client exposes six **groups**, each covering one area of the hardware
-API.  All methods are **synchronous** and raise
+The client exposes **groups**, each covering one area of the hardware
+API; the main ones are below, and the
+[documentation](https://esharp-accordion-projects-webapiclient-python.readthedocs.io/en/latest/)
+covers them all, including calibration, instruments, events and
+subscriptions, and the audit log.  All methods are **synchronous** and raise
 `AccordionQ2ApiError` on HTTP errors.
 
 ### `client.connection` &mdash; Connection Status
@@ -375,6 +378,111 @@ print(f"First 5 samples: {samples[:5]}")
 
 ---
 
+### `client.lease` &mdash; Control Lease
+
+One client at a time may change the station, typically a test station for
+the length of a sequence.  While another client holds the lease, this
+client's changes and forced reads raise `AccordionQ2ApiError` with status
+423; reads with `max_age_ms` and subscriptions keep working.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `get()` | `LeaseDto` | Who holds the lease, if anyone. |
+| `acquire(owner, ttl_ms=30000)` | `LeaseDto` | Take the lease (409 while someone else holds it). |
+| `renew(ttl_ms=None)` | `LeaseDto` | Renew the lease this client holds. |
+| `release()` | &mdash; | Release it. |
+| `hold(owner, ttl_ms=30000)` | context manager | Acquire, renew in the background, release after the block. |
+
+```python
+with client.lease.hold("TAT station 3"):
+    client.resources.set_value("0.4.ESH10000662.VSET1", "5")
+```
+
+---
+
+### `client.system` &mdash; Services, Reboot, Clock and boot.config
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `get_services()` | `list[ServiceStatus]` | The hardware app, the WebApi and the dashboard. |
+| `service_action(service_id, action)` | &mdash; | `start`, `stop`, `restart`, `enable` or `disable`. |
+| `reboot()` | &mdash; | Reboot the Pi. |
+| `get_clock()` | `ClockStatus` | The Pi's clock. |
+| `set_clock(utc=None, force=False)` | `ClockStatus` | Set it, to this computer's clock by default. |
+| `boot.get()` | `BootConfig` | The hardware app's start-up configuration (boot.config). |
+| `boot.set_startup(enabled=None, alias_files=None)` | `BootConfig` | Turn boot.config on or off, and/or replace the alias files. |
+| `boot.update(*, if_modified=None, ...)` | `BootConfig` | Edit boot.config section by section. |
+
+boot.config changes apply at the hardware app's next start (alias files and
+modules also on a reset).  `if_modified` gives 409 instead of overwriting
+another edit, and the Wi-Fi password is never returned.
+
+```python
+from accordionq2 import BootAliasFile
+
+client.system.boot.set_startup(enabled=True,
+                               alias_files=[BootAliasFile("station.csv")])
+client.system.set_clock()
+```
+
+---
+
+### `client.files` &mdash; Station Files
+
+Files in the station's folders (`config`, `alias`, `fsms`, `media`,
+`extensions`, and the read-only `logs` and `webapi-logs`).
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `get_roots()` | `list[FileRoot]` | The folders the file API reaches. |
+| `list(root, path="")` | `FileListing` | What a folder holds. |
+| `download(root, path)` | `bytes` | A file's bytes. |
+| `upload(root, path, data, overwrite=False)` | `FileEntry` | Upload a file. |
+| `create_folder(root, path)` | &mdash; | Create a folder. |
+| `move(root, source, target, overwrite=False)` | &mdash; | Rename or move within the folder. |
+| `delete(root, path, recursive=False)` | &mdash; | Delete a file or folder. |
+
+```python
+data = client.files.download("alias", "station.csv")
+client.files.upload("alias", "station_backup.csv", data)
+```
+
+---
+
+### `client.firmware` &mdash; Firmware Updates
+
+The station installs only releases signed by E-Sharp, checked on the station
+whichever way the package arrives, and nothing below 6.0.0.  Installing
+restarts the hardware app and the WebApi; `install()` and
+`install_package()` keep polling until the update has ended.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `get_state()` | `FirmwareState` | Installed version, source, minimum version, last update. |
+| `get_releases(include_beta=False)` | `FirmwareReleases` | Releases, newest first. |
+| `set_source(location)` | `FirmwareSource` | An http(s) address or a folder on the Pi; `None` for the default. |
+| `start_update(version, include_beta=False)` | `FirmwareUpdateStatus` | Start installing and return at once. |
+| `get_update()` / `get_update_log()` | `FirmwareUpdateStatus` / `str` | How the update stands, and its log. |
+| `wait_for_update(timeout=900.0, poll=2.0)` | `FirmwareUpdateStatus` | Wait until it has ended. |
+| `install(version, include_beta=False, timeout=900.0)` | `FirmwareUpdateStatus` | Start and wait. |
+| `upload_package(package)` | `FirmwareRelease` | Send a `rel-x.y.z.zip` from this computer. |
+| `install_package(package, timeout=900.0)` | `FirmwareUpdateStatus` | Upload, install and wait (a station without internet). |
+| `delete_package(file_name)` | &mdash; | Remove a package from the station's cache. |
+
+```python
+releases = client.firmware.get_releases()
+newest = next(r for r in releases.releases if r.installable)
+status = client.firmware.install(newest.version)
+if status.state != "succeeded":
+    print(status.state, status.message)
+    print(client.firmware.get_update_log())
+
+# A station without internet
+client.firmware.install_package("C:/releases/rel-6.0.0.zip")
+```
+
+---
+
 ## Models
 
 All models live in `accordionq2.models`.
@@ -392,6 +500,13 @@ All models live in `accordionq2.models`.
 | `BusTransactionResponse` | `device_name`, `action`, `received` (bytes), `number_of_bytes_received` |
 | `NumericResultChannelDto` | `net_name`, `alias`, `possible_target_names`, `sample_rate`, `default_samples` |
 | `NumericMeasureResultDto` | `channel_net_name`, `target_net_name`, `sample_count`, `sample_rate`, `reduced_set`, `started`, `stopped`, `duration` |
+
+The lease, system, boot.config, files and firmware models (`LeaseDto`,
+`ServiceStatus`, `ClockStatus`, `BootConfig`, `BootAliasFile`, `BootModule`,
+`BootAddress`, `BootService`, `BootWifi`, `FileRoot`, `FileListing`,
+`FileEntry`, `FirmwareState`, `FirmwareSource`, `FirmwareReleases`,
+`FirmwareRelease`, `FirmwareUpdateStatus`) live in their groups' modules
+and are importable from the top-level `accordionq2` package.
 
 Response models provide a `from_dict(data)` class method; request models
 provide a `to_dict()` instance method.

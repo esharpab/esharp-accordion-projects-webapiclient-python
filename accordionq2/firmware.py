@@ -180,9 +180,10 @@ class FirmwareGroup(ApiGroupBase):
     def start_update(self, version: str, include_beta: bool = False) -> FirmwareUpdateStatus:
         """Start installing *version* and return at once; follow :meth:`get_update`.
 
-        Raises 400 for a release below the minimum version or one that isn't signed by E-Sharp,
-        404 for a version neither the source nor the cache has, 409 while an update runs, and 501
-        off a station.
+        Raises 400 for a release below the minimum version or a malformed version, 409 while an
+        update runs, and 501 off a station. Everything found after the answer (a version neither
+        the source nor the cache has, a damaged download, a package not signed by E-Sharp) ends
+        the update in state ``failed``, with the reason in ``message``.
         """
         data = self._post_json(
             "api/system/firmware/update", {"version": version, "includeBeta": include_beta}

@@ -1,6 +1,6 @@
 # API Overview
 
-`AccordionQ2Client` exposes **nine operation groups**
+`AccordionQ2Client` exposes these operation groups
 
 ```python
 from accordionq2 import AccordionQ2Client
@@ -18,6 +18,12 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
     client.instruments       # Instruments (power supplies) and their function maps
     client.events            # Event stream: connection, configuration and values events
     client.subscriptions     # Value subscriptions delivered on the event stream
+    client.lease             # The control lease: one client at a time changes the station
+    client.system            # Services, reboot and clock
+    client.system.boot       # The hardware app's start-up configuration (boot.config)
+    client.files             # Files in the station's folders
+    client.firmware          # Firmware releases and updates
+    client.audit             # WebApi request audit log
 ```
 
 | Group | Description | Details |
@@ -33,3 +39,8 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 | [`calibration`](calibration.md) | Read and write Calibration channel tables | [→](calibration.md) |
 | [`events`, `subscriptions`](events.md) | Event stream and value subscriptions | [→](events.md) |
 | [`instruments`](instruments.md) | Instruments such as power-supply outputs, with the channel behind each capability | [→](instruments.md) |
+| [`lease`](lease.md) | Hold control of the station; other clients' changes get 423 | [→](lease.md) |
+| [`system`, `system.boot`](system.md) | Services, reboot, clock, and the start-up configuration (boot.config) | [→](system.md) |
+| [`files`](files.md) | Browse, download, upload, move and delete files in the station's folders | [→](files.md) |
+| [`firmware`](firmware.md) | List releases, install signed releases, update offline from a package | [→](firmware.md) |
+| [`audit`](audit.md) | WebApi request audit log | [→](audit.md) |

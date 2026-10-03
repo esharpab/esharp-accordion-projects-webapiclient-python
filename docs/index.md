@@ -10,7 +10,7 @@ This is the Python counterpart of the [.NET WebApiClient](https://www.nuget.org/
 ## Features
 
 - **Zero dependencies** &mdash; uses only the Python standard library (`http.client`, `json`, `ssl`, `threading`, `dataclasses`)
-- **Full API coverage** &mdash; 8 operation groups covering all hardware management endpoints
+- **Full API coverage** &mdash; operation groups covering all hardware management endpoints, from values and channels to firmware updates
 - **Synchronous & thread-safe** &mdash; simple blocking calls, safe from multiple threads
 - **Context manager support** &mdash; use with `with` blocks for clean resource management
 - **Cross-platform** &mdash; Windows, Linux (including ARM / Raspberry Pi), macOS
@@ -43,6 +43,12 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 - [Instruments](api/instruments.md) &mdash; power-supply outputs and their function maps
 - [Comm (Bus Transactions)](api/comm.md) &mdash; I2C, UART, SPI, Socket
 - [Numeric Results](api/numeric-results.md) &mdash; high-speed sampling
+- [Events and subscriptions](api/events.md) &mdash; event stream and value subscriptions
+- [Lease](api/lease.md) &mdash; hold control of the station
+- [System and boot.config](api/system.md) &mdash; services, reboot, clock and start-up configuration
+- [Files](api/files.md) &mdash; files in the station's folders
+- [Firmware](api/firmware.md) &mdash; signed releases, updates and offline packages
+- [Audit](api/audit.md) &mdash; WebApi request audit log
 
 ## Reference
 

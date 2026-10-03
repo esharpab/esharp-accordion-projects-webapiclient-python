@@ -19,7 +19,10 @@ except AccordionQ2ApiError as e:
 |-------------|---------|---------------|
 | 400 | Bad Request | Invalid parameters, or `get_samples()` called after `reduced_set=True` |
 | 404 | Not Found | Channel, resource, or config file does not exist |
+| 409 | Conflict | The lease is held by someone else (`acquire`), a file exists, boot.config changed since it was read (`if_modified`), or a firmware update is running |
+| 423 | Locked | Another client holds the [lease](api/lease.md); changes and forced reads are refused |
 | 500 | Internal Server Error | Hardware manager encountered an error |
+| 501 | Not Implemented | System, firmware or service calls on a WebApi that isn't on a station |
 | Connection refused | — | WebApi host is unreachable |
 
 ## Exception Attributes

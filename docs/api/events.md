@@ -12,6 +12,7 @@ The WebApi's event stream tells a client when the connection to the hardware app
 | `connection` | The WebApi's connection to the hardware app went up or down | `isConnected`, `generation`, `lastError` |
 | `configuration` | Channels were added, removed or changed | `changeType`, `generation` |
 | `values` | A subscription's values | `subscription`, `values`, `ageMs`, `errors` (when some failed) |
+| `lease` | The control lease was taken, renewed, released or expired | `held`, `owner`, `expiresInMs`, `since`; `hello` carries the same as `lease` |
 
 Thirty seconds without any data (the server pings every 10 s) raises `TimeoutError`; the server ending the stream raises `ConnectionError`. Reconnecting is yours: open a new stream, subscribe again, and reload channels, since missed events aren't replayed.
 

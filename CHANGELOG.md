@@ -21,6 +21,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The hardware app's start-up configuration, boot.config (accordionq2 contract section 11):
+  `client.system.boot.get()`, `set_startup(enabled, alias_files)` and `update(...)`, with
+  `if_modified` (409 instead of overwriting another edit) and the Wi-Fi password kept unless
+  `wifi_password` is given.
+- Firmware updates (accordionq2 contract section 12): `client.firmware.get_state()`,
+  `get_releases(include_beta=False)`, `set_source`, `start_update`, `get_update`, `get_update_log`,
+  `wait_for_update` and `install` (which poll through the station's restart), and
+  `upload_package`, `install_package` and `delete_package` for a station without internet. The
+  station installs only releases signed by E-Sharp, from 6.0.0 on.
 - The station's services, reboot and clock (accordionq2 contract section 9): `client.system.get_services()`,
   `service_action(id, action)`, `reboot()`, `get_clock()` and `set_clock(utc=None, force=False)`.
 - Files in the station's own folders (accordionq2 contract section 10): `client.files.get_roots()`, `list`,
