@@ -1,5 +1,13 @@
 """AccordionQ2 Python client library for the Hardware Management REST API."""
 
+from .boot import (
+    BootAddress,
+    BootAliasFile,
+    BootConfig,
+    BootModule,
+    BootService,
+    BootWifi,
+)
 from .client import AccordionQ2Client
 from .enums import (
     AppTypes,
@@ -12,6 +20,13 @@ from .enums import (
 from .events import EventStream, ServerEvent
 from .exceptions import AccordionQ2ApiError, AccordionQ2ShortReadError
 from .files import FileEntry, FileListing, FileRoot
+from .firmware import (
+    FirmwareRelease,
+    FirmwareReleases,
+    FirmwareSource,
+    FirmwareState,
+    FirmwareUpdateStatus,
+)
 from .lease import LeaseDto
 from .models import (
     AppLicenseDto,
@@ -43,6 +58,12 @@ __all__ = [
     "AppLicenseDto",
     # Enums
     "AppTypes",
+    "BootAddress",
+    "BootAliasFile",
+    "BootConfig",
+    "BootModule",
+    "BootService",
+    "BootWifi",
     "BusActions",
     "BusTransactionResponse",
     "CalibrationChannelDto",
@@ -59,6 +80,11 @@ __all__ = [
     "FileEntry",
     "FileListing",
     "FileRoot",
+    "FirmwareRelease",
+    "FirmwareReleases",
+    "FirmwareSource",
+    "FirmwareState",
+    "FirmwareUpdateStatus",
     "InstrumentDto",
     "LeaseDto",
     "ModuleSettingsDto",

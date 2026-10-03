@@ -11,6 +11,7 @@ from .comm import CommGroup
 from .connection import ConnectionGroup
 from .events import EventsGroup
 from .files import FilesGroup
+from .firmware import FirmwareGroup
 from .instruments import InstrumentsGroup
 from .lease import LeaseGroup
 from .media import MediaGroup
@@ -78,6 +79,7 @@ class AccordionQ2Client:
         self.lease = LeaseGroup(self._session)
         self.system = SystemGroup(self._session)
         self.files = FilesGroup(self._session)
+        self.firmware = FirmwareGroup(self._session)
 
     def __enter__(self) -> AccordionQ2Client:
         return self

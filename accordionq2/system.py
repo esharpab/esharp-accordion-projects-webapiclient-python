@@ -7,7 +7,8 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
-from ._base import ApiGroupBase
+from ._base import ApiGroupBase, HttpSession
+from .boot import BootGroup
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,10 +73,15 @@ class ClockStatus:
 
 
 class SystemGroup(ApiGroupBase):
-    """The station's services, reboot and clock.
+    """The station's services, reboot and clock; ``boot`` is its start-up configuration.
 
     Changes are writes: while another client holds the lease they raise 423.
     """
+
+    def __init__(self, session: HttpSession) -> None:
+        super().__init__(session)
+        #: The hardware app's start-up configuration, boot.config (contract section 11).
+        self.boot = BootGroup(session)
 
     def get_services(self) -> list[ServiceStatus]:
         """The hardware app, the WebApi and the dashboard, with their state."""
