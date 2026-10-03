@@ -188,10 +188,14 @@ def test_wait_for_update_passes_other_errors_on(monkeypatch):
 
 
 def test_wait_for_update_gives_up_after_the_timeout(monkeypatch):
-    monkeypatch.setattr("time.sleep", lambda _: None)
-    session = FakeSession(*[ConnectionRefusedError() for _ in range(1000)])
+    # A clock that moves a second per look, so the test doesn't depend on how fast the machine is.
+    clock = iter(range(1000))
+    monkeypatch.setattr("accordionq2.firmware.time.monotonic", lambda: next(clock))
+    monkeypatch.setattr("accordionq2.firmware.time.sleep", lambda _: None)
+    session = FakeSession(*[ConnectionRefusedError() for _ in range(100)])
     with pytest.raises(TimeoutError):
-        FirmwareGroup(session).wait_for_update(timeout=0.01, poll=0)
+        FirmwareGroup(session).wait_for_update(timeout=5, poll=0)
+    assert len(session.sent) <= 6
 
 
 def test_an_unsigned_package_is_refused_by_the_station():
