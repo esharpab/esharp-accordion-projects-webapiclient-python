@@ -6,7 +6,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [2.0.0] – unreleased
+## [5.28.1] – 2026-10-03
+
+From this release the Python and the C# client (AccordionQ2.WebApiClient on NuGet) share a version
+number: `accordionq2` 5.28.1 covers the same API as AccordionQ2.WebApiClient 5.28.1. The entries
+below gather everything since 1.2.0, released over the 2.0 and 5.x versions on PyPI.
 
 ### Breaking changes
 
