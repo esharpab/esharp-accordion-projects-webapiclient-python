@@ -11,6 +11,7 @@ from .enums import (
 )
 from .events import EventStream, ServerEvent
 from .exceptions import AccordionQ2ApiError, AccordionQ2ShortReadError
+from .files import FileEntry, FileListing, FileRoot
 from .lease import LeaseDto
 from .models import (
     AppLicenseDto,
@@ -30,6 +31,7 @@ from .models import (
     PhysicalSystemDto,
 )
 from .subscriptions import SubscriptionDto
+from .system import ClockStatus, ServiceStatus
 
 __all__ = [
     # Exceptions
@@ -50,9 +52,13 @@ __all__ = [
     "ChannelDto",
     "ChannelLookupRequest",
     "ChannelTypes",
+    "ClockStatus",
     "ConnectionStatusDto",
     "DirectionTypes",
     "EventStream",
+    "FileEntry",
+    "FileListing",
+    "FileRoot",
     "InstrumentDto",
     "LeaseDto",
     "ModuleSettingsDto",
@@ -63,6 +69,7 @@ __all__ = [
     "PhysicalModuleDto",
     "PhysicalSystemDto",
     "ServerEvent",
+    "ServiceStatus",
     "SubscriptionDto",
 ]
 

@@ -10,6 +10,7 @@ from .channels import ChannelsGroup
 from .comm import CommGroup
 from .connection import ConnectionGroup
 from .events import EventsGroup
+from .files import FilesGroup
 from .instruments import InstrumentsGroup
 from .lease import LeaseGroup
 from .media import MediaGroup
@@ -17,6 +18,7 @@ from .modules import ModulesGroup
 from .numeric_results import NumericResultsGroup
 from .resources import ResourcesGroup
 from .subscriptions import SubscriptionsGroup
+from .system import SystemGroup
 
 
 class AccordionQ2Client:
@@ -74,6 +76,8 @@ class AccordionQ2Client:
         self.events = EventsGroup(self._session)
         self.subscriptions = SubscriptionsGroup(self._session)
         self.lease = LeaseGroup(self._session)
+        self.system = SystemGroup(self._session)
+        self.files = FilesGroup(self._session)
 
     def __enter__(self) -> AccordionQ2Client:
         return self

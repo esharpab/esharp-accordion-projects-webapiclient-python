@@ -21,6 +21,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The station's services, reboot and clock (accordionq2 contract section 9): `client.system.get_services()`,
+  `service_action(id, action)`, `reboot()`, `get_clock()` and `set_clock(utc=None, force=False)`.
+- Files in the station's own folders (accordionq2 contract section 10): `client.files.get_roots()`, `list`,
+  `download`, `upload`, `create_folder`, `move` and `delete`.
 - `numeric_results.acquire(channel, target, samples, lsl=, usl=)`: the samples and their
   statistics in one call (accordionq2 contract section 8), as a `NumericAcquisition`.
 - The control lease (accordionq2 contract section 5.5): `client.lease.get/acquire/renew/release`,
