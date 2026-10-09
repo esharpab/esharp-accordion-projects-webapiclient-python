@@ -1,4 +1,6 @@
-# Lease
+# Lease: the Control Lease (X-Lease-Id, 409, 423)
+
+> Control lease summary: take it with POST /api/lease (409 when someone else holds it), send `X-Lease-Id` with every request, renew before it expires, release when done. Everyone else gets 423 Locked for changes and forced reads meanwhile.
 
 The control lease lets one client at a time change the station, typically a test station for the length of a test sequence, so that nobody else changes a setting in the middle of it.
 
@@ -67,6 +69,10 @@ except AccordionQ2ApiError as e:
     if e.status_code == 423:
         print("The station is held by another client:", e)
 ```
+
+## Not Bound by the Lease: Accordion Pilot
+
+The lease is enforced by the WebApi only. Accordion Pilot talks to the station over the byte protocol, not the REST API, so it is not bound by the lease: it can change the station while someone holds it. Keep Pilot away from a station during a leased test sequence.
 
 ## Model
 
