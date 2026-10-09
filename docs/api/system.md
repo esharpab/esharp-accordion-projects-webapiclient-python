@@ -8,7 +8,7 @@ The WebApi runs these on the Pi itself. Reads are open to anyone; changes are wr
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `get_services()` | `list[ServiceStatus]` | The hardware app, the WebApi and the dashboard, with their state. |
+| `get_services()` | `list[ServiceStatus]` | The hardware app and the WebApi, with their state. |
 | `service_action(service_id, action)` | &mdash; | `start`, `stop`, `restart`, `enable` or `disable` a service. Returns at once, without waiting for the job. |
 | `reboot()` | &mdash; | Reboot the Pi a second after answering. |
 | `get_clock()` | `ClockStatus` | The Pi's clock. |
@@ -17,7 +17,7 @@ The WebApi runs these on the Pi itself. Reads are open to anyone; changes are wr
 
 ## Services
 
-The services are `hardware` (the hardware app), `webapi` (the WebApi and its GUI) and `dashboard` (Node-RED). `enable` and `disable` turn starting at boot on or off; `start`, `stop` and `restart` return straight away, so follow `get_services()` to see the result.
+The services are `hardware` (the hardware app) and `webapi` (the WebApi and its GUI). `enable` and `disable` turn starting at boot on or off; `start`, `stop` and `restart` return straight away, so follow `get_services()` to see the result.
 
 The service marked `self` is the WebApi answering: it can be restarted through itself but not stopped. Restarting it drops every client's connection, and the event stream, for a few seconds.
 
@@ -140,7 +140,7 @@ client.system.boot.update(wifi=BootWifi(False, "", False), wifi_password="")
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | `str` | `hardware`, `webapi` or `dashboard` |
+| `id` | `str` | `hardware` or `webapi` |
 | `unit` | `str` | The systemd unit, e.g. `accordion.service` |
 | `description` | `str` | The unit's description |
 | `installed` | `bool` | `False` when the Pi doesn't have the unit |

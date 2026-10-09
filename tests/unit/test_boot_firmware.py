@@ -90,7 +90,7 @@ def test_update_sends_the_sections_given_and_keeps_the_password():
         enabled=True,
         ip_configurations=[BootAddress("eth0", "10.0.0.5/24", True)],
         wifi=BootWifi(True, "lab", password_set=False),
-        services=[BootService("NodeRed", "node-red-dashboard", False)],
+        services=[BootService("Example", "example-service", False)],
     )
     method, path, body, _ = session.sent[0]
     assert (method, path) == ("PUT", "api/system/boot")
@@ -99,7 +99,7 @@ def test_update_sends_the_sections_given_and_keeps_the_password():
         "enabled": True,
         "ipConfigurations": [{"interface": "eth0", "staticIp": "10.0.0.5/24", "enabled": True}],
         "wifi": {"enabled": True, "ssid": "lab", "password": None},
-        "services": [{"name": "NodeRed", "serviceFile": "node-red-dashboard", "enabled": False}],
+        "services": [{"name": "Example", "serviceFile": "example-service", "enabled": False}],
     }
 
 

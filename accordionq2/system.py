@@ -13,9 +13,9 @@ from .boot import BootGroup
 
 @dataclass(frozen=True, slots=True)
 class ServiceStatus:
-    """A service on the station: the hardware app, the WebApi or the dashboard."""
+    """A service on the station: the hardware app or the WebApi."""
 
-    #: ``hardware``, ``webapi`` or ``dashboard``.
+    #: ``hardware`` or ``webapi``.
     id: str
     #: The systemd unit, e.g. ``accordion.service``.
     unit: str
@@ -84,7 +84,7 @@ class SystemGroup(ApiGroupBase):
         self.boot = BootGroup(session)
 
     def get_services(self) -> list[ServiceStatus]:
-        """The hardware app, the WebApi and the dashboard, with their state."""
+        """The hardware app and the WebApi, with their state."""
         data = self._get_json("api/system/services")
         assert isinstance(data, list)
         return [ServiceStatus.from_dict(s) for s in data]

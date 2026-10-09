@@ -404,7 +404,7 @@ with client.lease.hold("TAT station 3"):
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `get_services()` | `list[ServiceStatus]` | The hardware app, the WebApi and the dashboard. |
+| `get_services()` | `list[ServiceStatus]` | The hardware app and the WebApi. |
 | `service_action(service_id, action)` | &mdash; | `start`, `stop`, `restart`, `enable` or `disable`. |
 | `reboot()` | &mdash; | Reboot the Pi. |
 | `get_clock()` | `ClockStatus` | The Pi's clock. |
