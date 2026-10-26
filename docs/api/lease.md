@@ -72,7 +72,7 @@ except AccordionQ2ApiError as e:
 
 ## Pilot Is Not Bound by the Lease
 
-The lease is enforced by the WebApi only. Accordion Pilot talks to the station over the byte protocol, not the REST API, so it is not bound by the lease: it can change the station while someone holds it. Keep Pilot away from a station during a leased test sequence.
+The lease is enforced by the WebApi, which from 7.0 is the only way to the station, so every client is bound by it. On a 6.x station Accordion Pilot talks over the byte protocol, not the REST API, so it is not bound by the lease: it can change the station while someone holds it. Keep Pilot away from a 6.x station during a leased test sequence.
 
 ## Model
 

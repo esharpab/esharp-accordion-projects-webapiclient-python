@@ -8,7 +8,7 @@ The WebApi runs these on the Pi itself. Reads are open to anyone; changes are wr
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `get_services()` | `list[ServiceStatus]` | The hardware app and the WebApi, with their state. |
+| `get_services()` | `list[ServiceStatus]` | The station's services, with their state. |
 | `service_action(service_id, action)` | &mdash; | `start`, `stop`, `restart`, `enable` or `disable` a service. Returns at once, without waiting for the job. |
 | `reboot()` | &mdash; | Reboot the Pi a second after answering. |
 | `get_clock()` | `ClockStatus` | The Pi's clock. |
@@ -17,7 +17,7 @@ The WebApi runs these on the Pi itself. Reads are open to anyone; changes are wr
 
 ## Services
 
-The services are `hardware` (the hardware app) and `webapi` (the WebApi and its GUI). `enable` and `disable` turn starting at boot on or off; `start`, `stop` and `restart` return straight away, so follow `get_services()` to see the result.
+From 7.0 a station has one service, `webapi`: the WebApi, its GUI and the hardware engine, in one process, so restarting it restarts the hardware too. A 6.x station has two: `hardware` (the separate hardware app) and `webapi` (the WebApi and its GUI). `enable` and `disable` turn starting at boot on or off; `start`, `stop` and `restart` return straight away, so follow `get_services()` to see the result.
 
 The service marked `self` is the WebApi answering: it can be restarted through itself but not stopped. Restarting it drops every client's connection, and the event stream, for a few seconds.
 
@@ -27,7 +27,7 @@ Errors: 404 for an unknown service, 400 for an action the service can't take, 50
 for s in client.system.get_services():
     print(f"{s.id:<10} {s.unit:<28} {s.active_state}/{s.sub_state}  boot={s.enabled}")
 
-client.system.service_action("hardware", "restart")
+client.system.service_action("webapi", "restart")   # on 6.x, "hardware" restarts only the hardware app
 ```
 
 ## Reboot
@@ -59,7 +59,7 @@ client.system.set_clock(datetime(2026, 10, 3, 8, 15, tzinfo=timezone.utc), force
 
 When the hardware app starts it applies the `services` always, and only when `enabled` is `True` also the Wi-Fi, the static addresses and the USB ports; after the engine starts, the `modules` and then the `alias_files` in order. The engine loads the modules and alias files again on every reset.
 
-**Changes apply at the hardware app's next start** (the alias files and modules also at the next reset), not at once.
+**Changes apply at the hardware's next start** (from 7.0 a restart of `webapi`, on 6.x of `hardware`; the alias files and modules also at the next reset), not at once.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
@@ -141,7 +141,7 @@ client.system.boot.update(wifi=BootWifi(False, "", False), wifi_password="")
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | `str` | `hardware` or `webapi` |
-| `unit` | `str` | The systemd unit, e.g. `accordion.service` |
+| `unit` | `str` | The systemd unit, e.g. `accordionq2-webapi.service` |
 | `description` | `str` | The unit's description |
 | `installed` | `bool` | `False` when the Pi doesn't have the unit |
 | `active_state` | `str` | systemd's state: `active`, `inactive`, `failed`, `activating`, `deactivating` |
