@@ -23,6 +23,7 @@ from .events import EventStream, ServerEvent
 from .exceptions import (
     AccordionQ2ApiError,
     AccordionQ2CertificateError,
+    AccordionQ2NotSupportedError,
     AccordionQ2SecurityError,
     AccordionQ2SecurityReason,
     AccordionQ2ShortReadError,
@@ -53,6 +54,7 @@ from .models import (
     PhysicalModuleDto,
     PhysicalSystemDto,
 )
+from .resources import CachedValues
 from .subscriptions import SubscriptionDto
 from .system import ClockStatus, ServiceStatus
 
@@ -62,6 +64,7 @@ __all__ = [
     "AccordionQ2CertificateError",
     # Client
     "AccordionQ2Client",
+    "AccordionQ2NotSupportedError",
     "AccordionQ2SecurityError",
     "AccordionQ2SecurityReason",
     "AccordionQ2ShortReadError",
@@ -77,6 +80,7 @@ __all__ = [
     "BootWifi",
     "BusActions",
     "BusTransactionResponse",
+    "CachedValues",
     "CalibrationChannelDto",
     "CalibrationRowDto",
     "CalibrationTableDto",

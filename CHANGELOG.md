@@ -18,11 +18,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - `ChannelConfigRequest.channel_type`: change a channel's type (one type; a combination raises
   `ValueError`). The docs listed it, but the client couldn't send it. `channel_type_to_json` in
   `accordionq2.enums`.
+- **Cache-only reads**: `client.resources.read_cached(names, max_age_ms=0)` sends `values/get` with
+  `cacheOnly` (firmware 7.0.5 or later) and returns `CachedValues` (`values`, `ages_ms`, `not_cached`).
+  The station answers from its value cache alone, never reads the hardware and never refuses it under
+  the lease. A name with no cached value at most `max_age_ms` old (any age for 0), and every channel whose
+  reads consume data, is in `not_cached`. The call checks `CapabilitiesDto.VALUES_CACHE_ONLY`
+  (`"values.cacheOnly"`) first, because an older WebApi ignores the field and reads; without it the new
+  `AccordionQ2NotSupportedError` is raised and no values are asked for. The check is kept for 60 s
+  (`ResourcesGroup.CAPABILITY_CHECK_LIFETIME_S`) and redone after any failed call, so a station rolled
+  back to older firmware is caught; and "any age" (`max_age_ms` 0) is sent as `2**31 - 1` ms, so such a
+  station would answer from its cache rather than force a read of every name. Existing calls are unchanged.
 
 ### Compatibility
 
 - **`value` needs firmware 7.0.5 or later.** Older firmware ignores it (200 OK) and the output
-  starts at its last reading.
+  starts at its last reading; `cacheOnly` is refused by the client itself before it is sent.
 - The new fields come after the existing ones, so positional arguments keep their meaning.
 
 ---
