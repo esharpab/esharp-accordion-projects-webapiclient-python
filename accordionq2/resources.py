@@ -2,10 +2,28 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import cast
 
-from ._base import ApiGroupBase
-from .exceptions import AccordionQ2ApiError
+from ._base import ApiGroupBase, HttpSession
+from .capabilities import CapabilitiesDto, CapabilitiesGroup
+from .exceptions import AccordionQ2ApiError, AccordionQ2NotSupportedError
+
+
+@dataclass(frozen=True, slots=True)
+class CachedValues:
+    """What :meth:`ResourcesGroup.read_cached` answers (accordionq2 contract section 5.2).
+
+    A name is in :attr:`values` and :attr:`ages_ms`, or in :attr:`not_cached`, never both.
+    """
+
+    #: Each name the cache had a value for, and the value.
+    values: dict[str, str]
+    #: How old each value in :attr:`values` is, in ms.
+    ages_ms: dict[str, float]
+    #: The names it had no value for (none fresh enough, or a channel whose reads consume
+    #: data), in the order asked; empty when every name was cached.
+    not_cached: tuple[str, ...]
 
 
 def _extract_value(result: object, path: str) -> str:
@@ -28,6 +46,10 @@ class ResourcesGroup(ApiGroupBase):
     Resources are identified by name (e.g. ``"Voltage.VDD"``,
     ``"Temperature.Ambient"``).
     """
+
+    def __init__(self, session: HttpSession) -> None:
+        super().__init__(session)
+        self._cache_only_checked = False
 
     def get_names(self) -> list[str]:
         """Return the names of all available resources."""
@@ -69,6 +91,47 @@ class ResourcesGroup(ApiGroupBase):
         assert isinstance(result, dict)
         ages = result.get("ageMs") or {}
         return cast(dict[str, str], result["resources"]), {k: float(v) for k, v in ages.items()}
+
+    def read_cached(self, names: list[str], max_age_ms: int = 0) -> CachedValues:
+        """Read several resources from the WebApi's value cache alone (``cacheOnly``).
+
+        The station never reads the hardware for this call and the lease never refuses it,
+        so it can't switch a mux or reset a peak buffer under a running test. A name with no
+        cached value at most *max_age_ms* old is in :attr:`CachedValues.not_cached`, and so
+        is every channel whose reads consume data. *max_age_ms* 0 takes a cached value of
+        any age; :attr:`CachedValues.ages_ms` says how old each is.
+
+        The first call asks ``GET /api/capabilities`` for
+        :attr:`CapabilitiesDto.VALUES_CACHE_ONLY`, since an older WebApi ignores
+        ``cacheOnly`` and reads the hardware. Without it this raises
+        :class:`AccordionQ2NotSupportedError` and asks for no values; it raises it too
+        when an answer has no ``notCached``. A name no channel has is an
+        :class:`AccordionQ2ApiError` 400, as with the other reads.
+        """
+        feature = CapabilitiesDto.VALUES_CACHE_ONLY
+        if not self._cache_only_checked:
+            if not CapabilitiesGroup(self._session).get().has(feature):
+                raise AccordionQ2NotSupportedError(
+                    feature,
+                    f"The station doesn't offer cache-only reads (feature {feature!r}, "
+                    "firmware 7.0.5 or later); nothing was read",
+                )
+            self._cache_only_checked = True
+        body = {"Names": names, "MaxAgeMs": max_age_ms, "CacheOnly": True}
+        result = self._post_json("api/resources/values/get", body)
+        not_cached = result.get("notCached") if isinstance(result, dict) else None
+        if not isinstance(result, dict) or not isinstance(not_cached, list):
+            raise AccordionQ2NotSupportedError(
+                feature,
+                "The station answered without notCached: it ignored cacheOnly "
+                "and may have read the hardware",
+            )
+        ages = result.get("ageMs") or {}
+        return CachedValues(
+            values=cast(dict[str, str], result.get("resources") or {}),
+            ages_ms={k: float(v) for k, v in ages.items()},
+            not_cached=tuple(str(n) for n in not_cached),
+        )
 
     def set_values(self, resources: dict[str, str]) -> None:
         """Set values for multiple resources in one round-trip.

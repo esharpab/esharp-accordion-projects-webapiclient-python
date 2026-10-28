@@ -118,3 +118,18 @@ class AccordionQ2ShortReadError(Exception):
 
     def __repr__(self) -> str:
         return f"AccordionQ2ShortReadError({self.requested_bytes}, {self.received_bytes})"
+
+
+class AccordionQ2NotSupportedError(Exception):
+    """Raised when the station lacks a feature a call needs, before the call is made.
+
+    *feature* is the capability it lacks (see :class:`CapabilitiesDto`), such as
+    ``"values.cacheOnly"``.
+    """
+
+    def __init__(self, feature: str, message: str) -> None:
+        super().__init__(message)
+        self.feature = feature
+
+    def __repr__(self) -> str:
+        return f"AccordionQ2NotSupportedError({self.feature!r}, {self.args[0]!r})"

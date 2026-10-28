@@ -22,6 +22,9 @@ class CapabilitiesDto:
     EVENTS: ClassVar[str] = "events"
     #: Feature: the station checks API keys (``X-Api-Key``) as :attr:`security_mode` says.
     SECURITY_API_KEY: ClassVar[str] = "security.apikey"
+    #: Feature: ``values/get`` takes ``cacheOnly`` (``client.resources.read_cached()``). A WebApi
+    #: without it ignores the field and reads the hardware.
+    VALUES_CACHE_ONLY: ClassVar[str] = "values.cacheOnly"
 
     #: The contract version; 0 for a WebApi that predates it.
     api_version: int = 0

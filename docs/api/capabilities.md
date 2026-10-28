@@ -49,5 +49,6 @@ else:
 | `CapabilitiesDto.CHANNELS_ENCODED` | `"channels.encoded"` | The encoded channel calls work (in the .NET client; this one doesn't have them yet) |
 | `CapabilitiesDto.EVENTS` | `"events"` | The [event stream](events.md) works |
 | `CapabilitiesDto.SECURITY_API_KEY` | `"security.apikey"` | The station checks API keys as `security_mode` says ([Security](../security.md)) |
+| `CapabilitiesDto.VALUES_CACHE_ONLY` | `"values.cacheOnly"` | `client.resources.read_cached()` works ([cache-only reads](resources.md#cache-only-reads)); checked by the client itself |
 
 The server may list other features too, for example `"instruments"`; `has` takes any string.
