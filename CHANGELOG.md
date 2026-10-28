@@ -6,10 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [7.0.0] – unreleased
+## [7.0.0] – 2026-10-28
 
 Secured stations (FW7 CLI-01): an API key, HTTPS with a pinned certificate, and IPv6 addresses.
-`accordionq2` 7.0.0 matches AccordionQ2.WebApiClient 7.0.0. The date goes in with the `v7.0.0` tag.
+`accordionq2` 7.0.0 matches AccordionQ2.WebApiClient 7.0.0 and Accordion firmware 7.
+
+### Compatibility with 5.x
+
+The major version follows the firmware; for most code 7.0.0 is a drop-in upgrade.
+
+- **Code that ran against 5.28 runs unchanged.** Every call, argument and return type is the same;
+  `api_key` and `cert_sha256` are new optional keyword arguments, and without them the client
+  sends exactly what 5.28 sent. Python 3.11 or later, as before.
+- **Existing error handling keeps working.** `AccordionQ2SecurityError` (a 401/403) is an
+  `AccordionQ2ApiError`, and `AccordionQ2CertificateError` is an `ssl.SSLCertVerificationError`,
+  so `except AccordionQ2ApiError` and `except ssl.SSLError` still catch them.
+- **Every firmware works.** Against firmware 6.x, or a firmware 7 station whose security mode
+  is `Off` (the default), the client behaves as 5.28. Firmware 6.x ignores a key sent to it.
+- **What can break** (see Breaking changes below): a base URL that isn't absolute `http(s)://`
+  with a host, or carries a user name/password; two `X-Api-Key` entries in `default_headers`; code
+  that matched a 401's message text or expected a 3xx body. None of these happen against a
+  station, which never redirects.
 
 ### Breaking changes
 
