@@ -10,6 +10,7 @@ from .boot import (
 )
 from .capabilities import CapabilitiesDto
 from .certificates import normalize_sha256, sha256_of
+from .channels import ByteStreamImage, ByteStreamLoadError, ByteStreamStatus
 from .client import AccordionQ2Client
 from .enums import (
     AppTypes,
@@ -77,6 +78,9 @@ __all__ = [
     "BootWifi",
     "BusActions",
     "BusTransactionResponse",
+    "ByteStreamImage",
+    "ByteStreamLoadError",
+    "ByteStreamStatus",
     "CalibrationChannelDto",
     "CalibrationRowDto",
     "CalibrationTableDto",

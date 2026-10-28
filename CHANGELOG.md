@@ -6,6 +6,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- `channels.upload_bytestream(name, image, target="sram", file_name=None, force=False)`: sends a file to a
+  ByteStream file channel (`POST /api/channels/bytestream`, firmware 7.0.5), e.g. an FPGA image to MicroHAPS's
+  `JTAG.FPGA_IMAGE`, loaded into the KU5P's SRAM by openFPGALoader without Vivado. `image` is bytes, an open
+  binary file or a path; a file is sent as it is read, not read whole.
+- `channels.bytestream_status(name)`, `channels.wait_bytestream(name, timeout)` and
+  `channels.load_fpga_image(name, image)` (upload and wait; raises `ByteStreamLoadError` when the load fails);
+  `ByteStreamStatus` and `ByteStreamImage`.
+- The transport sends an open binary file as a request body; a retried request sends it again from its start.
+
+---
+
 ## [7.0.0] – 2026-10-28
 
 Secured stations (FW7 CLI-01): an API key, HTTPS with a pinned certificate, and IPv6 addresses.

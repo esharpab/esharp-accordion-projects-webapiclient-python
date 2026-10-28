@@ -10,6 +10,10 @@ Channels represent multi-purpose I/O pins (analog, digital, I2C, SPI, etc.).
 | `get_channel(alias=, net_name=)` | `ChannelDto` | Look up one channel by alias or net name. |
 | `configure(config)` | &mdash; | Partial-update a single channel. |
 | `configure_many(configs)` | &mdash; | Partial-update multiple channels. |
+| `upload_bytestream(name, image, target="sram", file_name=None, force=False)` | `ByteStreamStatus` | Send a file to a ByteStream file channel (MicroHAPS `JTAG.FPGA_IMAGE`: an FPGA image); firmware 7.0.5. |
+| `bytestream_status(name)` | `ByteStreamStatus` | The load's state, progress and result, and the last image's name, size and SHA-256. |
+| `wait_bytestream(name, timeout=120, poll=0.5)` | `ByteStreamStatus` | Poll the status until `done` or `failed`. |
+| `load_fpga_image(name, image, target="sram", timeout=120)` | `ByteStreamStatus` | Upload and wait; raises `ByteStreamLoadError` when the load fails. |
 
 ## Examples
 
@@ -63,6 +67,43 @@ client.channels.configure_many([
     ChannelConfigRequest(net_name="MPIO01", enabled=True, direction="OUT"),
 ])
 ```
+
+### Loading an FPGA image (firmware 7.0.5)
+
+MicroHAPS has a ByteStream channel `JTAG.FPGA_IMAGE` (Unit `file:FPGA image`). It takes a file, not a value: the
+client sends the file to `POST /api/channels/bytestream`, and the station checks it and loads it into the KU5P's SRAM
+with openFPGALoader, without Vivado and whether or not the XVC server is on. `resources.set_values` on this channel is
+refused (400). `image` is the bytes, an open binary file or a path; a file is sent as it is read, not read whole.
+Loading needs the Operator role, as switching `XVC_ENABLE` on does: the station checks the part (XCKU5P-FFVB676) and
+the IDCODE, not what the design drives. Writing the configuration flash is not in 7.0.5 (`target="flash"` gives 501).
+
+```python
+from accordionq2 import AccordionQ2Client, ByteStreamLoadError
+
+with AccordionQ2Client("http://station:5000", api_key="acc_...") as client:
+    try:
+        status = client.channels.load_fpga_image("1.MicroHAPS.JTAG.FPGA_IMAGE", "hci_mig_top.bit")
+    except ByteStreamLoadError as error:
+        print("failed:", error.status.message)   # e.g. "...is for xcku3p-ffva676-1-e, not the XCKU5P..."
+        raise
+    print(status.image.file_name, status.image.sha256, status.image.duration_ms, "ms")
+    client.resources.set_value("1.MicroHAPS.HCI.Scan", "True")   # the new design's HCI devices
+```
+
+| Status | When |
+|--------|------|
+| 400 | Not a file channel, a bad file name or extension, or the station refused the file (another part, a partial bitstream, not a bitstream) |
+| 409 | A load, a POWER cycle or a PROGRAM pulse is running; the board is off; Vivado is connected to XVC (pass `force=True` to cut it) |
+| 413 | Over 64 MB |
+| 423 | Another client holds the lease |
+| 501 | `target="flash"` |
+| 504 | The station didn't take the file in time: read the status, the load may still start |
+
+`ByteStreamStatus`: `state` (`idle`, `validating`, `loading`, `waitingDone`, `done`, `failed`), `progress` (0 to 100),
+`phase`, `message`, `accept`, `targets`, `max_bytes`, and `image` (`ByteStreamImage`: `file_name`, `size`, `sha256`,
+`format`, `design`, `part`, `built`, `started`, `finished`, `duration_ms`, `result`, `loaded`, `replaced`,
+`design_keys`). `loaded` turns `False` once a POWER cycle or a PROGRAM_B pulse has put the flash design back;
+`design_keys` is the DesignID device's `Info.Keys` from the first `HCI.Scan` after the load.
 
 ### `ChannelConfigRequest` Fields
 
