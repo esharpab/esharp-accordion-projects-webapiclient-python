@@ -14,6 +14,7 @@ from accordionq2.enums import (
     MpioUsageTypes,
     ParityTypes,
     UartBusTypes,
+    channel_type_to_json,
     direction_to_json,
     parse_channel_types,
     parse_direction_types,
@@ -377,6 +378,65 @@ class TestChannelConfigRequest:
         r = ChannelConfigRequest()
         r.alias = "changed"
         assert r.alias == "changed"
+
+    # value: an output's value in the same configure as its direction and type (firmware 7.0.5)
+    @pytest.mark.parametrize(
+        ("value", "wire"),
+        [
+            (True, "True"),
+            (False, "False"),
+            (1, "1.0"),
+            (0, "0.0"),
+            (1.8, "1.8"),
+            (1e-7, "1e-07"),
+            ("0.8", "0.8"),
+            ("True", "True"),
+        ],
+    )
+    def test_value_serialised_as_the_station_parses_it(self, value, wire):
+        d = ChannelConfigRequest(
+            net_name="MPIO04", direction=DirectionTypes.OUT, value=value
+        ).to_dict()
+        assert d["Value"] == wire
+
+    def test_bool_is_not_sent_as_a_number(self):
+        # isinstance(True, int) is true; the station refuses "1" for a PseudoDigital channel
+        assert ChannelConfigRequest(value=True).to_dict()["Value"] == "True"
+
+    def test_numpy_scalar_is_a_plain_number(self):
+        np = pytest.importorskip("numpy")
+        assert ChannelConfigRequest(value=np.float64(1.8)).to_dict()["Value"] == "1.8"
+
+    def test_no_value_is_left_out(self):
+        assert "Value" not in ChannelConfigRequest(direction=DirectionTypes.OUT).to_dict()
+
+    def test_channel_type_serialised(self):
+        d = ChannelConfigRequest(channel_type=ChannelTypes.PSEUDO_DIGITAL).to_dict()
+        assert d == {"ChannelType": "PseudoDigital"}
+
+    def test_existing_positional_fields_keep_their_place(self):
+        r = ChannelConfigRequest(
+            "A", "N", True, DirectionTypes.OUT, "d", "V", "G", "D", {"gain": 1.0}
+        )
+        assert r.details == {"gain": 1.0}
+        assert r.channel_type is None and r.value is None
+
+
+class TestChannelTypeToJson:
+    def test_single_types(self):
+        assert channel_type_to_json(ChannelTypes.ANALOG) == "Analog"
+        assert channel_type_to_json(ChannelTypes.PSEUDO_DIGITAL) == "PseudoDigital"
+        assert channel_type_to_json(ChannelTypes.I2C) == "I2C"
+
+    def test_round_trip(self):
+        for t in (ChannelTypes.DIGITAL, ChannelTypes.RATIOMETRIC, ChannelTypes.NUMERIC_RESULT):
+            assert parse_channel_types(channel_type_to_json(t)) == t
+
+    def test_combined_flags_are_refused(self):
+        with pytest.raises(ValueError):
+            channel_type_to_json(ChannelTypes.ANALOG | ChannelTypes.PSEUDO_DIGITAL)
+        with pytest.raises(ValueError):
+            channel_type_to_json(ChannelTypes(0))
 
 
 # ---------------------------------------------------------------------------

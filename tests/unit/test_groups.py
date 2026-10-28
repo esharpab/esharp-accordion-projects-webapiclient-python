@@ -353,6 +353,43 @@ class TestChannelDetails:
         body = json.loads(session.request.call_args.kwargs["body"])
         assert body == {"NetName": "0.1.X.V", "Details": {"gain": 2.0}}
 
+    def test_configure_sends_type_direction_and_value_in_one_request(self):
+        from accordionq2.enums import ChannelTypes, DirectionTypes
+
+        session = _session((200, {"message": "ok"}))
+        ChannelsGroup(session).configure(
+            ChannelConfigRequest(
+                net_name="0.3.ESH10000121.MPIO05",
+                direction=DirectionTypes.OUT,
+                channel_type=ChannelTypes.PSEUDO_DIGITAL,
+                details={"vl": 0.5, "vh": 3.0},
+                value=False,
+            )
+        )
+        assert session.request.call_count == 1
+        body = json.loads(session.request.call_args.kwargs["body"])
+        assert body == {
+            "NetName": "0.3.ESH10000121.MPIO05",
+            "Direction": "OUT",
+            "ChannelType": "PseudoDigital",
+            "Details": {"vl": 0.5, "vh": 3.0},
+            "Value": "False",
+        }
+
+    def test_configure_many_sends_each_value(self):
+        from accordionq2.enums import DirectionTypes
+
+        session = _session((200, {"message": "ok"}))
+        ChannelsGroup(session).configure_many(
+            [
+                ChannelConfigRequest(net_name="A", direction=DirectionTypes.OUT, value=0.8),
+                ChannelConfigRequest(net_name="B", description="no value"),
+            ]
+        )
+        body = json.loads(session.request.call_args.kwargs["body"])
+        assert body[0]["Value"] == "0.8"
+        assert "Value" not in body[1]
+
 
 class TestInstrumentsGroup:
     def test_get_all_parses_function_map(self):

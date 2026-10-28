@@ -151,6 +151,17 @@ Partial-update request &mdash; only non-`None` fields are applied. See [Channels
 client.channels.configure(ChannelConfigRequest(net_name="0.2.ESH10000560.MEAS2_VPP", details={"gain": 2.0}))
 ```
 
+`channel_type` (`ChannelTypes | None`) switches the channel to one other type in its `channel_type_capability`;
+a combination of flags raises `ValueError`. `value` (`str | float | int | bool | None`) is the output's value,
+applied in the same configure as the direction, type and details: without it, a channel that becomes an output
+starts at its default value, never at its last reading. Firmware 7.0.5 or later; older firmware ignores it (see
+[Channels](../api/channels.md#switching-an-mpio-to-an-output-at-a-known-level)).
+
+```python
+client.channels.configure(ChannelConfigRequest(
+    net_name="0.3.ESH10000121.MPIO04", direction=DirectionTypes.OUT, value=0.8))
+```
+
 ### `InstrumentDto`
 
 | Field | Type | Description |

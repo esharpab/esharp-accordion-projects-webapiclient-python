@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numbers
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -13,6 +14,7 @@ from .enums import (
     ChannelTypes,
     DirectionTypes,
     MpioUsageTypes,
+    channel_type_to_json,
     direction_to_json,
     parse_channel_types,
     parse_direction_types,
@@ -234,6 +236,17 @@ class ChannelConfigRequest:
     #: ``{"gain": 2.0}`` or ``{"pullType": "Up"}``. The WebApi refuses a key the channel's
     #: type can't configure, or a bad value, with a 400 naming it.
     details: dict[str, Any] | None = None
+    #: The active channel type to switch to, one type (e.g. ``ChannelTypes.PSEUDO_DIGITAL``); it
+    #: must be in the channel's ``channel_type_capability``.
+    channel_type: ChannelTypes | None = None
+    #: The output's value, applied in the same configure as ``direction``, ``channel_type`` and
+    #: ``details``, so an MPIO switched from input to output doesn't drive its last reading first:
+    #: a number for an Analog channel (in its units, at the gain and offset the request leaves),
+    #: True/False for a PseudoDigital or Digital one; a string is sent as it is ("1.8", "True").
+    #: Without it, a channel that becomes an output starts at its default value. Only for a
+    #: channel the request leaves an output. Needs firmware 7.0.5 or later: older firmware
+    #: ignores it and the output starts at its last reading.
+    value: str | float | int | bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {}
@@ -255,7 +268,24 @@ class ChannelConfigRequest:
             result["DeviceName"] = self.device_name
         if self.details is not None:
             result["Details"] = dict(self.details)
+        if self.channel_type is not None:
+            result["ChannelType"] = channel_type_to_json(self.channel_type)
+        if self.value is not None:
+            result["Value"] = _value_to_json(self.value)
         return result
+
+
+def _value_to_json(value: str | float | int | bool) -> str:
+    """A configure value as the station parses it: "True"/"False", or an invariant number.
+
+    bool before the numbers (``isinstance(True, int)`` is true, and "1" is no bool to the
+    station); ``repr(float(v))`` so a numpy scalar goes out as "1.8", not "np.float64(1.8)".
+    """
+    if isinstance(value, bool):
+        return "True" if value else "False"
+    if isinstance(value, numbers.Real):
+        return repr(float(value))
+    return str(value)
 
 
 @dataclass(frozen=True, slots=True)

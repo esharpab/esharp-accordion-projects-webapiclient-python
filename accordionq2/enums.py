@@ -161,6 +161,7 @@ _CHANNEL_TYPE_JSON: dict[str, int] = {
 }
 
 _DIRECTION_JSON_REV: dict[int, str] = {v: k for k, v in _DIRECTION_JSON.items() if v != 0}
+_CHANNEL_TYPE_JSON_REV: dict[int, str] = {v: k for k, v in _CHANNEL_TYPE_JSON.items() if v != 0}
 
 
 def parse_direction_types(value: int | str) -> DirectionTypes:
@@ -187,3 +188,15 @@ def direction_to_json(value: DirectionTypes) -> str:
     """Serialize a DirectionTypes value to a JSON-compatible string."""
     parts = [_DIRECTION_JSON_REV[m.value] for m in DirectionTypes if m.value and m in value]
     return ", ".join(parts) if parts else "Undefined"
+
+
+def channel_type_to_json(value: ChannelTypes) -> str:
+    """Serialize one ChannelTypes value to its JSON name (e.g. ``"PseudoDigital"``).
+
+    A channel has one type at a time, so a configure takes one: a combination of flags, or
+    none, raises ValueError, as the station would refuse it with a 400.
+    """
+    name = _CHANNEL_TYPE_JSON_REV.get(int(value))
+    if name is None:
+        raise ValueError(f"channel_type must be one single type, got {value!r}")
+    return name

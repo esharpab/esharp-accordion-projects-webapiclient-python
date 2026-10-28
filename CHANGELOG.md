@@ -6,6 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [7.1.0] – 2026-10-28
+
+### Added
+
+- `ChannelConfigRequest.value`: an output's value, applied in the same configure as `direction`,
+  `channel_type` and `details`, so an MPIO switched from input to output starts at that level
+  instead of the last value read while it was an input. Sent as a string: a bool as
+  `"True"`/`"False"` (checked before the numbers, since `True` is an `int`), a number as an
+  invariant float (a numpy scalar too), a string as it is.
+- `ChannelConfigRequest.channel_type`: change a channel's type (one type; a combination raises
+  `ValueError`). The docs listed it, but the client couldn't send it. `channel_type_to_json` in
+  `accordionq2.enums`.
+
+### Compatibility
+
+- **`value` needs firmware 7.0.5 or later.** Older firmware ignores it (200 OK) and the output
+  starts at its last reading.
+- The new fields come after the existing ones, so positional arguments keep their meaning.
+
+---
+
 ## [7.0.0] – 2026-10-28
 
 Secured stations (FW7 CLI-01): an API key, HTTPS with a pinned certificate, and IPv6 addresses.
