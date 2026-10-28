@@ -14,9 +14,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   `cacheOnly` (firmware 7.0.5 or later) and returns `CachedValues` (`values`, `ages_ms`, `not_cached`).
   The station answers from its value cache alone, never reads the hardware and never refuses it under
   the lease. A name with no cached value at most `max_age_ms` old (any age for 0), and every channel whose
-  reads consume data, is in `not_cached`. The first call checks `CapabilitiesDto.VALUES_CACHE_ONLY`
-  (`"values.cacheOnly"`), because an older WebApi ignores the field and reads; without it the new
-  `AccordionQ2NotSupportedError` is raised and no values are asked for. Existing calls are unchanged.
+  reads consume data, is in `not_cached`. The call checks `CapabilitiesDto.VALUES_CACHE_ONLY`
+  (`"values.cacheOnly"`) first, because an older WebApi ignores the field and reads; without it the new
+  `AccordionQ2NotSupportedError` is raised and no values are asked for. The check is kept for 60 s
+  (`ResourcesGroup.CAPABILITY_CHECK_LIFETIME_S`) and redone after any failed call, so a station rolled
+  back to older firmware is caught; and "any age" (`max_age_ms` 0) is sent as `2**31 - 1` ms, so such a
+  station would answer from its cache rather than force a read of every name. Existing calls are unchanged.
 
 ## [7.0.0] – 2026-10-28
 

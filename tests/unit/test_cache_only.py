@@ -54,7 +54,7 @@ class TestReadCached:
             ),
         ]
 
-    def test_capabilities_are_asked_once(self):
+    def test_capabilities_are_asked_once_within_their_lifetime(self):
         answer = {"resources": {}, "ageMs": {}, "notCached": ["A"]}
         session = make_session([(200, WITH_FEATURE), (200, answer), (200, answer)])
         group = ResourcesGroup(session)
@@ -66,11 +66,58 @@ class TestReadCached:
             "api/resources/values/get",
         ]
 
-    def test_max_age_defaults_to_zero_any_age(self):
-        session = make_session([(200, WITH_FEATURE), (200, {"resources": {}, "notCached": []})])
-        result = ResourcesGroup(session).read_cached(["A"])
-        assert _sent(session)[1][2] == {"Names": ["A"], "MaxAgeMs": 0, "CacheOnly": True}
+    def test_any_age_goes_on_the_wire_as_int_max_not_zero(self):
+        # 0 to an older WebApi that ignores cacheOnly would force a hardware read of every name.
+        answer = {"resources": {}, "notCached": []}
+        session = make_session([(200, WITH_FEATURE), (200, answer), (200, answer)])
+        group = ResourcesGroup(session)
+        result = group.read_cached(["A"])
+        group.read_cached(["A"], max_age_ms=-5)
+        sent = _sent(session)
+        assert sent[1][2] == {"Names": ["A"], "MaxAgeMs": 2**31 - 1, "CacheOnly": True}
+        assert sent[2][2]["MaxAgeMs"] == 2**31 - 1
         assert result.not_cached == ()
+
+    def test_capabilities_are_asked_again_once_their_lifetime_is_over(self):
+        answer = {"resources": {}, "ageMs": {}, "notCached": ["A"]}
+        session = make_session([(200, WITH_FEATURE), (200, answer), (200, WITHOUT_FEATURE)])
+        group = ResourcesGroup(session)
+        now = [1000.0]
+        group._clock = lambda: now[0]
+        group.read_cached(["A"])
+        # A minute on, and the station rolled back to older firmware meanwhile.
+        now[0] += ResourcesGroup.CAPABILITY_CHECK_LIFETIME_S
+        with pytest.raises(AccordionQ2NotSupportedError):
+            group.read_cached(["A"])
+        assert [path for _, path, _ in _sent(session)] == [
+            "api/capabilities",
+            "api/resources/values/get",
+            "api/capabilities",
+        ]
+
+    def test_a_failed_call_makes_the_next_one_ask_for_the_capabilities_again(self):
+        answer = {"resources": {}, "ageMs": {}, "notCached": ["A"]}
+        session = make_session(
+            [
+                (200, WITH_FEATURE),
+                (200, answer),
+                (503, {"error": "restarting"}),
+                (200, WITHOUT_FEATURE),
+            ]
+        )
+        group = ResourcesGroup(session)
+        group._clock = lambda: 1000.0  # the lifetime never runs out
+        group.read_cached(["A"])
+        with pytest.raises(AccordionQ2ApiError):
+            group.read_cached(["A"])
+        with pytest.raises(AccordionQ2NotSupportedError):
+            group.read_cached(["A"])  # back on older firmware
+        assert [path for _, path, _ in _sent(session)] == [
+            "api/capabilities",
+            "api/resources/values/get",
+            "api/resources/values/get",
+            "api/capabilities",
+        ]
 
     def test_a_station_without_the_feature_is_never_asked_for_values(self):
         session = make_session([(200, WITHOUT_FEATURE)])

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import cast
+from typing import ClassVar, cast
 
 from ._base import ApiGroupBase, HttpSession
 from .capabilities import CapabilitiesDto, CapabilitiesGroup
@@ -47,9 +49,16 @@ class ResourcesGroup(ApiGroupBase):
     ``"Temperature.Ambient"``).
     """
 
+    #: How long :meth:`read_cached` trusts a capability check before asking again, in seconds.
+    CAPABILITY_CHECK_LIFETIME_S: ClassVar[float] = 60.0
+    #: ``2**31 - 1`` ms (24.8 days): what :meth:`read_cached` sends for "any age".
+    _ANY_AGE_MS: ClassVar[int] = 2**31 - 1
+
     def __init__(self, session: HttpSession) -> None:
         super().__init__(session)
-        self._cache_only_checked = False
+        #: When the station last said it has ``values.cacheOnly`` (``_clock`` seconds), or None.
+        self._cache_only_checked_at: float | None = None
+        self._clock: Callable[[], float] = time.monotonic
 
     def get_names(self) -> list[str]:
         """Return the names of all available resources."""
@@ -98,29 +107,45 @@ class ResourcesGroup(ApiGroupBase):
         The station never reads the hardware for this call and the lease never refuses it,
         so it can't switch a mux or reset a peak buffer under a running test. A name with no
         cached value at most *max_age_ms* old is in :attr:`CachedValues.not_cached`, and so
-        is every channel whose reads consume data. *max_age_ms* 0 takes a cached value of
-        any age; :attr:`CachedValues.ages_ms` says how old each is.
+        is every channel whose reads consume data. *max_age_ms* 0 (or less) takes a cached
+        value of any age; :attr:`CachedValues.ages_ms` says how old each is.
 
-        The first call asks ``GET /api/capabilities`` for
-        :attr:`CapabilitiesDto.VALUES_CACHE_ONLY`, since an older WebApi ignores
+        The call asks ``GET /api/capabilities`` for
+        :attr:`CapabilitiesDto.VALUES_CACHE_ONLY` first, since an older WebApi ignores
         ``cacheOnly`` and reads the hardware. Without it this raises
         :class:`AccordionQ2NotSupportedError` and asks for no values; it raises it too
-        when an answer has no ``notCached``. A name no channel has is an
-        :class:`AccordionQ2ApiError` 400, as with the other reads.
+        when an answer has no ``notCached``. The answer is kept for
+        :attr:`CAPABILITY_CHECK_LIFETIME_S` and dropped after any failed call, so a station
+        whose update rolled back to older firmware is asked again. For the same reason
+        "any age" is sent as ``2**31 - 1`` ms rather than 0: a 7.0.5 station reads it the
+        same way, and an older one that ignores ``cacheOnly`` answers from its cache and
+        reads only the names it has no value for, instead of forcing a read of every name.
+
+        A name not in ``GET /api/channels`` (hidden system lines included) is an
+        :class:`AccordionQ2ApiError` 400, and nothing is read.
         """
         feature = CapabilitiesDto.VALUES_CACHE_ONLY
-        if not self._cache_only_checked:
+        checked_at = self._cache_only_checked_at
+        if checked_at is None or self._clock() - checked_at >= self.CAPABILITY_CHECK_LIFETIME_S:
+            self._cache_only_checked_at = None
             if not CapabilitiesGroup(self._session).get().has(feature):
                 raise AccordionQ2NotSupportedError(
                     feature,
                     f"The station doesn't offer cache-only reads (feature {feature!r}, "
                     "firmware 7.0.5 or later); nothing was read",
                 )
-            self._cache_only_checked = True
-        body = {"Names": names, "MaxAgeMs": max_age_ms, "CacheOnly": True}
-        result = self._post_json("api/resources/values/get", body)
+            self._cache_only_checked_at = self._clock()
+        wire_age = max_age_ms if max_age_ms > 0 else self._ANY_AGE_MS
+        body = {"Names": names, "MaxAgeMs": wire_age, "CacheOnly": True}
+        try:
+            result = self._post_json("api/resources/values/get", body)
+        except BaseException:
+            # The station may be restarting, perhaps into older firmware: check again next time.
+            self._cache_only_checked_at = None
+            raise
         not_cached = result.get("notCached") if isinstance(result, dict) else None
         if not isinstance(result, dict) or not isinstance(not_cached, list):
+            self._cache_only_checked_at = None
             raise AccordionQ2NotSupportedError(
                 feature,
                 "The station answered without notCached: it ignored cacheOnly "

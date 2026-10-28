@@ -64,10 +64,10 @@ for name in r.not_cached:
     print(f"{name}: not cached")
 ```
 
-- A name whose cached value is at most `max_age_ms` old is in `values` and `ages_ms`. Any other name is in `not_cached` and in neither of the others. `max_age_ms=0` (the default) takes a cached value of any age.
+- A name whose cached value is at most `max_age_ms` old is in `values` and `ages_ms`. Any other name is in `not_cached` and in neither of the others. `max_age_ms=0` (the default) or less takes a cached value of any age; it goes on the wire as `2**31 - 1` ms (24.8 days), so an older WebApi that ignored `cacheOnly` would answer from its cache rather than read every name.
 - Channels whose reads use data up (bus receives, byte streams, numeric results) are always in `not_cached`.
-- A name no channel has raises `AccordionQ2ApiError` 400, as the other reads do.
-- The first call checks `GET /api/capabilities` for `CapabilitiesDto.VALUES_CACHE_ONLY` (firmware 7.0.5 or later). An older WebApi would ignore `cacheOnly` and read the hardware, so without the feature the call raises `AccordionQ2NotSupportedError` and asks for no values. It raises it too when an answer has no `notCached`.
+- A name not in `GET /api/channels` raises `AccordionQ2ApiError` 400 and nothing is read. That includes hidden system lines, which `read_values` can read.
+- The call checks `GET /api/capabilities` for `CapabilitiesDto.VALUES_CACHE_ONLY` (firmware 7.0.5 or later) first. An older WebApi would ignore `cacheOnly` and read the hardware, so without the feature the call raises `AccordionQ2NotSupportedError` and asks for no values. It raises it too when an answer has no `notCached`. The check is kept for `ResourcesGroup.CAPABILITY_CHECK_LIFETIME_S` (60 s) and made again after any failed call, so a station whose update rolled back to older firmware is caught before it is asked for values.
 
 `CachedValues` is a frozen dataclass: `values` (`dict[str, str]`), `ages_ms` (`dict[str, float]`) and `not_cached` (`tuple[str, ...]`, in the order asked, empty when every name was cached).
 
