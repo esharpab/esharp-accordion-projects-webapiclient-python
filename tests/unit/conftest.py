@@ -23,6 +23,8 @@ def make_session(responses: list[tuple[int, object]]) -> HttpSession:
     session._verify = True
     session._conn = None
     session._default_headers = {}
+    session._api_key = None
+    session._pin = None
 
     import threading
 

@@ -16,6 +16,7 @@ This is the Python counterpart of the [.NET WebApiClient](https://www.nuget.org/
 - **Cross-platform** &mdash; Windows, Linux (including ARM / Raspberry Pi), macOS
 - **Fully typed** &mdash; complete PEP 484 type annotations, compatible with mypy strict mode
 - **Immutable models** &mdash; all response DTOs are frozen dataclasses
+- **Secured stations** &mdash; an API key on every request, HTTPS with a pinned certificate fingerprint or a site CA, IPv6 addresses
 
 ## Quick Example
 
@@ -34,10 +35,12 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 
 - [Installation](getting-started/installation.md)
 - [Quick Start](getting-started/quickstart.md)
+- [Security](security.md) &mdash; API keys, HTTPS with a pinned certificate, IPv6 addresses
 
 ## API Reference
 
 - [Overview](api/overview.md) &mdash; all the API groups at a glance
+- [Capabilities](api/capabilities.md) &mdash; what the WebApi supports, and its security mode
 - [Resources](api/resources.md), [Channels](api/channels.md), [Modules](api/modules.md), [Application](api/application.md), [Media](api/media.md), [Connection](api/connection.md)
 - [Calibration](api/calibration.md) &mdash; calibration operations
 - [Instruments](api/instruments.md) &mdash; power-supply outputs and their function maps
@@ -57,7 +60,7 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 
 ## Error Handling
 
-- [Error Handling](error-handling.md) &mdash; exceptions and error patterns
+- [Error Handling](error-handling.md) &mdash; exceptions and error patterns, 401 and 403 included
 
 ## Additional Topics
 

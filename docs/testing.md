@@ -53,6 +53,11 @@ ACCORDIONQ2_API_URL=http://mydevice.local:5000 pytest tests/ -m performance -v
 
 Tests without a marker are plain unit tests and run by default.
 
+`tests/unit/test_tls.py` runs the API key, certificate pins and IPv6 addresses against HTTP and HTTPS
+servers it starts on the loopback interface, with the test certificates in `tests/unit/data/tls`
+(made by `make-certs.sh` there; their keys are public, so trust them nowhere else). The IPv6 tests
+are skipped where there is no IPv6 loopback.
+
 ## Hardware-Specific Tests
 
 Some integration tests are automatically **skipped** when the connected hardware does not have the

@@ -14,6 +14,8 @@ The WebApi's event stream tells a client when the connection to the hardware app
 | `values` | A subscription's values | `subscription`, `values`, `ageMs`, `errors` (when some failed) |
 | `lease` | The control lease was taken, renewed, released or expired | `held`, `owner`, `expiresInMs`, `since`; `hello` carries the same as `lease` |
 
+The stream carries the client's `api_key` and is checked against its `cert_sha256` like every request. A station that refuses it raises `AccordionQ2SecurityError`: no or an unknown API key (401), or a role below `Viewer` (403); see [Security](../security.md). A WebApi without the stream raises `AccordionQ2ApiError` (404).
+
 Thirty seconds without any data (the server pings every 10 s) raises `TimeoutError`; the server ending the stream raises `ConnectionError`. Reconnecting is yours: open a new stream, subscribe again, and reload channels, since missed events aren't replayed.
 
 ## Subscriptions

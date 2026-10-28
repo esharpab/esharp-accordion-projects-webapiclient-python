@@ -32,9 +32,11 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quick Start: getting-started/quickstart.md
+  - Security: security.md
   - API Reference:
       - Overview: api/overview.md
       - Connection: api/connection.md
+      - Capabilities: api/capabilities.md
       - Resources: api/resources.md
       - Channels: api/channels.md
       - Modules: api/modules.md

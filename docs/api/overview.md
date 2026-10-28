@@ -7,6 +7,7 @@ from accordionq2 import AccordionQ2Client
 
 with AccordionQ2Client("http://agent64.local:5000") as client:
     client.connection        # Connection status
+    client.capabilities      # What the WebApi supports, and its security mode
     client.resources         # Hardware resource values (read/write)
     client.channels          # Channel configuration
     client.modules           # Module management & topology
@@ -29,6 +30,7 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 | Group | Description | Details |
 |-------|-------------|---------|
 | [`connection`](connection.md) | Check hardware manager connectivity | [→](connection.md) |
+| [`capabilities`](capabilities.md) | Contract and codec versions, features, security mode; needs no API key | [→](capabilities.md) |
 | [`resources`](resources.md) | Read/write hardware values (voltages, temperatures, etc.) | [→](resources.md) |
 | [`channels`](channels.md) | Configure multi-purpose I/O channels | [→](channels.md) |
 | [`modules`](modules.md) | Load/unload modules, query hardware topology | [→](modules.md) |

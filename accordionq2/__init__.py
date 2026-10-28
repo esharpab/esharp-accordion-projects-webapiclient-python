@@ -8,6 +8,8 @@ from .boot import (
     BootService,
     BootWifi,
 )
+from .capabilities import CapabilitiesDto
+from .certificates import normalize_sha256, sha256_of
 from .client import AccordionQ2Client
 from .enums import (
     AppTypes,
@@ -18,7 +20,13 @@ from .enums import (
     MpioUsageTypes,
 )
 from .events import EventStream, ServerEvent
-from .exceptions import AccordionQ2ApiError, AccordionQ2ShortReadError
+from .exceptions import (
+    AccordionQ2ApiError,
+    AccordionQ2CertificateError,
+    AccordionQ2SecurityError,
+    AccordionQ2SecurityReason,
+    AccordionQ2ShortReadError,
+)
 from .files import FileEntry, FileListing, FileRoot
 from .firmware import (
     FirmwareRelease,
@@ -51,8 +59,11 @@ from .system import ClockStatus, ServiceStatus
 __all__ = [
     # Exceptions
     "AccordionQ2ApiError",
+    "AccordionQ2CertificateError",
     # Client
     "AccordionQ2Client",
+    "AccordionQ2SecurityError",
+    "AccordionQ2SecurityReason",
     "AccordionQ2ShortReadError",
     # Models - DTOs (read-only, frozen)
     "AppLicenseDto",
@@ -69,6 +80,7 @@ __all__ = [
     "CalibrationChannelDto",
     "CalibrationRowDto",
     "CalibrationTableDto",
+    "CapabilitiesDto",
     "ChannelConfigRequest",
     "ChannelDto",
     "ChannelLookupRequest",
@@ -97,6 +109,9 @@ __all__ = [
     "ServerEvent",
     "ServiceStatus",
     "SubscriptionDto",
+    # Certificate fingerprints
+    "normalize_sha256",
+    "sha256_of",
 ]
 
 from importlib.metadata import PackageNotFoundError

@@ -14,11 +14,13 @@ client = AccordionQ2Client("http://agent64.local:5000")
 
 | Parameter         | Type                      | Default | Description |
 |-------------------|---------------------------|---------|-------------|
-| `base_url`        | `str`                     | —       | Base URL of the AccordionQ2 WebApi, e.g. `"http://raspberrypi:5000"` |
+| `base_url`        | `str`                     | —       | Base URL of the AccordionQ2 WebApi, e.g. `"http://raspberrypi:5000"`, `"https://[::1]:5001"` or `"http://[fe80::1%eth0]:5000"` |
 | `timeout`         | `float`                   | `30.0`  | HTTP request timeout in seconds |
 | `auth`            | `tuple[str, str] \| None` | `None`  | Optional `(username, password)` for HTTP Basic Auth |
-| `verify`          | `bool \| str`             | `True`  | TLS certificate verification. `False` disables (useful for self-signed certs on embedded devices). A string is treated as a path to a CA bundle file. |
-| `default_headers` | `dict[str, str] \| None`  | `None`  | Additional headers merged into every request (e.g. `{"X-Api-Key": "secret"}`) |
+| `verify`          | `bool \| str`             | `True`  | TLS certificate verification: `True` uses the system CAs, a string is a path to a CA bundle (e.g. a site CA), `False` disables it. For a station's self-signed certificate use `cert_sha256` |
+| `default_headers` | `dict[str, str] \| None`  | `None`  | Additional headers merged into every request; an `X-Api-Key` here is handled as `api_key` |
+| `api_key`         | `str \| None`             | `None`  | Keyword only (7.0). The station API key, sent as `X-Api-Key` on every request: see [Security](../security.md) |
+| `cert_sha256`     | `str \| None`             | `None`  | Keyword only (7.0). The SHA-256 fingerprint of the station's HTTPS certificate: exactly that certificate is accepted. See [Security](../security.md) |
 
 ### Using a Context Manager
 
@@ -38,22 +40,24 @@ names = client.resources.get_names()
 client.close()
 ```
 
-### Authentication and TLS
+### API Keys and HTTPS
 
 ```python
-# HTTP Basic Auth
-with AccordionQ2Client("https://device.local:5001", auth=("admin", "secret")) as client:
+import os
+
+# An API key (X-Api-Key on every request, the event stream included)
+with AccordionQ2Client("http://station-12:5000",
+                       api_key=os.environ["ACCORDION_API_KEY"]) as client:
     names = client.resources.get_names()
 
-# Self-signed certificate — disable TLS verification
-with AccordionQ2Client("https://device.local:5001", verify=False) as client:
-    names = client.resources.get_names()
-
-# Custom header (e.g. API key)
-with AccordionQ2Client("http://device.local:5000",
-                       default_headers={"X-Api-Key": "my-key"}) as client:
+# And HTTPS with the station's self-signed certificate, pinned by its SHA-256 fingerprint
+with AccordionQ2Client("https://station-12:5001",
+                       api_key=os.environ["ACCORDION_API_KEY"],
+                       cert_sha256="3F:A2:7C:...:9C") as client:
     names = client.resources.get_names()
 ```
+
+Over `http://` the key crosses the network in clear text: acceptable only on a trusted intranet segment. See [Security](../security.md) for modes, roles, pins, a site CA and IPv6 addresses.
 
 ## Checking the Connection
 
@@ -115,7 +119,7 @@ client.channels.configure(ChannelConfigRequest(
 
 ## Handling Errors
 
-All API errors raise `AccordionQ2ApiError`:
+All API errors raise `AccordionQ2ApiError`; a refusal for want of an API key or role (401, 403) is its subclass `AccordionQ2SecurityError` ([Error Handling](../error-handling.md)):
 
 ```python
 from accordionq2 import AccordionQ2ApiError

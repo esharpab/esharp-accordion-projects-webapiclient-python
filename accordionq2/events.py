@@ -10,7 +10,6 @@ from types import TracebackType
 from typing import Any
 
 from ._base import HttpSession
-from .exceptions import AccordionQ2ApiError
 
 #: The contract's limit: no data at all (events or pings) for this long means a dead stream.
 SILENCE_LIMIT_SECONDS = 30.0
@@ -126,18 +125,27 @@ class EventsGroup:
         self._session = session
 
     def open(self, silence_limit: float = SILENCE_LIMIT_SECONDS) -> EventStream:
-        """Open ``GET /api/events`` on a new connection and read its ``hello``."""
+        """Open ``GET /api/events`` on a new connection and read its ``hello``.
+
+        The stream carries the client's API key and certificate pin like every
+        request. Raises :class:`AccordionQ2SecurityError` when the station
+        refuses it (401, or 403 below ``Viewer``), and :class:`AccordionQ2ApiError`
+        when it can't be opened otherwise (404 for a WebApi without it).
+        """
         conn = self._session.new_connection(timeout=silence_limit)
-        conn.request(
-            "GET",
-            self._session.full_path("api/events"),
-            headers={**self._session.default_headers, "Accept": "text/event-stream"},
-        )
-        response = conn.getresponse()
-        if response.status >= 400:
-            body = response.read().decode("utf-8", errors="replace")
-            conn.close()
-            raise AccordionQ2ApiError(
-                response.status, body or "The event stream couldn't be opened"
+        try:
+            conn.request(
+                "GET",
+                self._session.full_path("api/events"),
+                headers=self._session.request_headers({"Accept": "text/event-stream"}),
             )
+            response = conn.getresponse()
+            if not 200 <= response.status < 300:
+                body = response.read()
+                raise self._session.error_for(
+                    response.status, body, "The event stream couldn't be opened"
+                )
+        except BaseException:
+            conn.close()
+            raise
         return EventStream(conn, response)

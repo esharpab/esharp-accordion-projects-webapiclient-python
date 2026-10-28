@@ -73,28 +73,41 @@ client.close()
 ### Constructor
 
 ```python
-AccordionQ2Client(base_url, timeout=30.0, auth=None, verify=True, default_headers=None)
+AccordionQ2Client(base_url, timeout=30.0, auth=None, verify=True, default_headers=None,
+                  *, api_key=None, cert_sha256=None)
 ```
 
 | Parameter         | Type                    | Default | Description |
 |-------------------|-------------------------|---------|-------------|
-| `base_url`        | `str`                   | —       | Base URL of the AccordionQ2 WebApi, e.g. `"http://raspberrypi:5000"` |
+| `base_url`        | `str`                   | —       | Base URL of the AccordionQ2 WebApi, e.g. `"http://raspberrypi:5000"`, `"https://[::1]:5001"` or `"http://[fe80::1%eth0]:5000"` |
 | `timeout`         | `float`                 | `30.0`  | HTTP request timeout in seconds |
 | `auth`            | `tuple[str, str] \| None` | `None`  | Optional `(username, password)` for HTTP Basic Auth |
-| `verify`          | `bool \| str`           | `True`  | TLS certificate verification. `False` disables (useful for self-signed certs). A string is treated as a path to a CA bundle. |
-| `default_headers` | `dict[str, str] \| None` | `None`  | Additional headers merged into every request (e.g. `{"X-Api-Key": "secret"}`) |
+| `verify`          | `bool \| str`           | `True`  | TLS certificate verification: `True` uses the system CAs, a string is a path to a CA bundle (e.g. a site CA), `False` disables it. For a station's self-signed certificate use `cert_sha256`. |
+| `default_headers` | `dict[str, str] \| None` | `None`  | Additional headers merged into every request; an `X-Api-Key` here is handled as `api_key` |
+| `api_key`         | `str \| None`           | `None`  | The station API key (`acc_...`), sent as `X-Api-Key` on every request, the event stream included (7.0) |
+| `cert_sha256`     | `str \| None`           | `None`  | The SHA-256 fingerprint of the station's HTTPS certificate: exactly that certificate is accepted, and any other is refused before anything is sent (7.0) |
 
 ```python
-# HTTP Basic Auth
-client = AccordionQ2Client("https://device.local:5001", auth=("admin", "secret"))
+import os
 
-# Self-signed certificate — disable TLS verification
-client = AccordionQ2Client("https://device.local:5001", verify=False)
+# An API key
+client = AccordionQ2Client("http://station-12:5000", api_key=os.environ["ACCORDION_API_KEY"])
 
-# API key header
-client = AccordionQ2Client("http://device.local:5000",
-                           default_headers={"X-Api-Key": "my-api-key"})
+# An API key and HTTPS with the station's self-signed certificate, pinned
+client = AccordionQ2Client("https://station-12:5001",
+                           api_key=os.environ["ACCORDION_API_KEY"],
+                           cert_sha256="3F:A2:7C:...:9C")
+
+# A site CA instead of a pin
+client = AccordionQ2Client("https://station-12.lab.example:5001", verify="site-ca.pem")
 ```
+
+Over `http://` the key crosses the network in clear text: acceptable only on a trusted intranet
+segment. The client never logs the key or puts it in an exception message or a `repr()`, and doesn't
+follow redirects, so the key goes only to the base URL's host. A station in security mode `On`
+refuses a request without a valid key with `AccordionQ2SecurityError` (401, or 403 for too low a
+role). `client.capabilities.get().security_mode` tells, without a key, whether a station checks
+keys. See [Security](https://esharp-accordion-projects-webapiclient-python.readthedocs.io/en/latest/security/).
 
 ---
 
@@ -558,6 +571,12 @@ except AccordionQ2ApiError as e:
     print(f"HTTP {e.status_code}: {e}")
 ```
 
+A refusal for want of an API key (401) or a role (403) is its subclass
+`AccordionQ2SecurityError`, with `reason` (`MISSING_API_KEY`, `INVALID_API_KEY`
+or `ROLE_TOO_LOW`) and `required_role`.  Over HTTPS, a certificate that isn't
+the pinned one raises `AccordionQ2CertificateError` (an
+`ssl.SSLCertVerificationError`) before anything is sent.
+
 ---
 
 ## Running the Tests
@@ -617,6 +636,8 @@ respective language:
 | Config | `ChannelConfigRequest.Enabled = true` | `ChannelConfigRequest(enabled=True)` |
 | Enums | `ChannelTypes.Analog` | `ChannelTypes.ANALOG` |
 | Errors | `AccordionQ2ApiException` | `AccordionQ2ApiError` |
+| 401 / 403 | `AccordionQ2SecurityException` | `AccordionQ2SecurityError` |
+| API key, pin | `AccordionQ2ClientOptions { ApiKey, CertificateSha256 }` | `api_key=`, `cert_sha256=` |
 | Dependencies | Newtonsoft.Json | None (stdlib only) |
 | Install | `dotnet add package AccordionQ2.WebApiClient` | `pip install accordionq2` |
 | Package | [NuGet](https://www.nuget.org/packages/AccordionQ2.WebApiClient/) | [PyPI](https://pypi.org/project/accordionq2/) |

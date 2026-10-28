@@ -6,6 +6,70 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [7.0.0] – unreleased
+
+Secured stations (FW7 CLI-01): an API key, HTTPS with a pinned certificate, and IPv6 addresses.
+`accordionq2` 7.0.0 matches AccordionQ2.WebApiClient 7.0.0. The date goes in with the `v7.0.0` tag.
+
+### Breaking changes
+
+- **A base URL must be an absolute `http://` or `https://` URL with a host**, or the constructor
+  raises `ValueError`. One with a user name or password in it is refused too (they used to be
+  ignored): send the key with `api_key`.
+- **A 3xx answer raises `AccordionQ2ApiError`.** The station's API never redirects, and the client
+  doesn't follow one; it used to return the redirect's body.
+- **An `X-Api-Key` in `default_headers` is handled as the API key.** Without `api_key` it becomes the
+  key, with the same checks (a key a header can't carry raises `ValueError`) and protections (it is
+  withheld from server text, and a 401 is `INVALID_API_KEY`); with `api_key` it is dropped. Two of
+  them in different cases raise `ValueError`. `HttpSession.default_headers` no longer lists it, in
+  either case. With `api_key`, an `X-Api-Key` set later with `set_default_header`, in any case, is
+  replaced on each request rather than sent as a second header.
+- **A 401 raises `AccordionQ2SecurityError`** (see Added) whose message is the client's own (no key,
+  or a key the station doesn't accept), followed by the server's error text as `(station: ...)`. It
+  used to be a plain `AccordionQ2ApiError` with only the server's text.
+
+### Added
+
+- `AccordionQ2Client(..., api_key=...)`: the station API key, sent as `X-Api-Key` on every request,
+  the event stream included. It replaces an `X-Api-Key` in `default_headers`. A key with characters
+  a header can't carry raises `ValueError`. The key is never put in an exception message or a
+  `repr()` (`repr(client)` shows `api_key=set`), and server text that would repeat it is withheld.
+  The client holds it as a `str` whose `repr()` is `'<api key>'`, so a traceback that shows local
+  variables doesn't show it in the client's frames (`http.client`'s frames still hold the request
+  bytes; docs/security.md says so). `repr()` of a client whose constructor raised no longer raises.
+- `AccordionQ2Client(..., cert_sha256=...)`: pin the station's HTTPS certificate by its SHA-256
+  fingerprint, with or without colons, spaces or dashes, in either case. Exactly that certificate
+  is accepted, self-signed or reached by IP address; any other raises `AccordionQ2CertificateError`
+  (an `ssl.SSLCertVerificationError`, with `expected` and `actual`) right after the handshake,
+  before the request (and so the key) is sent, on the event stream too. A pin with an `http://`
+  URL or together with a CA bundle in `verify` raises `ValueError` rather than being ignored. A
+  pinned certificate's validity dates aren't checked, as in the .NET client.
+- `AccordionQ2SecurityError`, a subclass of `AccordionQ2ApiError`, for a 401 and for a 403 that
+  names a role, from requests and the event stream: `reason` (`AccordionQ2SecurityReason`:
+  `MISSING_API_KEY`, `INVALID_API_KEY`, `ROLE_TOO_LOW`) and `required_role`. A 403 without a role
+  (a read-only folder) stays a plain `AccordionQ2ApiError`.
+- `client.capabilities.get()`: `CapabilitiesDto` with `api_version`, `webapi_version`,
+  `codec_version`, `features`, `has(feature)` and `security_mode` (`"Off"`, `"Report"`, `"On"`).
+  It needs no API key; a WebApi without it (404) gives `CapabilitiesDto()`.
+- IPv6 addresses in base URLs, in brackets, with a zone id as `%eth0` or RFC 6874's `%25eth0`:
+  `http://[::1]:5000`, `http://[fe80::1%eth0]:5000`. As in the .NET client, `%25` followed by more
+  is the RFC 6874 form (`%2512` is zone 12) and `%25` alone is zone 25; an empty zone is refused.
+  Over HTTPS the zone is left out of TLS, so no IP address goes out as the server name (SNI).
+- `accordionq2.normalize_sha256(fingerprint)` and `sha256_of(certificate)` (DER bytes or PEM text
+  with one certificate: a PEM chain raises `ValueError`).
+- docs/security.md: modes, keys, roles, pins, a site CA, IPv6. The plain-`http://` key crosses the
+  network in clear text, which the docs say wherever they show it. `verify=<CA bundle>` (a site
+  CA) is documented as what it does: the certificate must chain to that CA, match the host name
+  and be meant for TLS servers (serverAuth).
+- Unit tests against HTTP and HTTPS servers on the loopback interface (tests/unit/test_tls.py),
+  with test certificates in tests/unit/data/tls.
+
+### Fixed
+
+- A certificate the client refuses is no longer tried a second time for a GET.
+
+---
+
 ## [5.28.1] – 2026-10-03
 
 From this release the Python and the C# client (AccordionQ2.WebApiClient on NuGet) share a version

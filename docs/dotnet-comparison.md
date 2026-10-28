@@ -13,6 +13,10 @@ Both the Python and .NET clients expose the same API surface with idiomatic nami
 | Config | `ChannelConfigRequest.Enabled = true` | `ChannelConfigRequest(enabled=True)` |
 | Enums | `ChannelTypes.Analog` | `ChannelTypes.ANALOG` |
 | Errors | `AccordionQ2ApiException` | `AccordionQ2ApiError` |
+| 401 / 403 | `AccordionQ2SecurityException` (`Reason`, `RequiredRole`) | `AccordionQ2SecurityError` (`reason`, `required_role`) |
+| API key, pin | `new AccordionQ2ClientOptions { ApiKey = k, CertificateSha256 = p }` | `api_key=k, cert_sha256=p` |
+| Site CA | `TrustedCaCertificate` (added to the OS's CAs) | `verify="site-ca.pem"` (instead of the OS's CAs) |
+| Wrong certificate | `HttpRequestException` (inner `AuthenticationException`) | `AccordionQ2CertificateError` (an `ssl.SSLCertVerificationError`) |
 | Type annotations | Full (Nullable Reference Types) | Full (PEP 484, mypy strict) |
 | Dependencies | Newtonsoft.Json | None (stdlib only) |
 | Install | `dotnet add package AccordionQ2.WebApiClient` | `pip install accordionq2` |
