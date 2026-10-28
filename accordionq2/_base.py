@@ -25,6 +25,7 @@ import ssl
 import threading
 import time
 import uuid
+from typing import BinaryIO
 from urllib.parse import urlparse
 
 from .certificates import normalize_sha256
@@ -438,14 +439,19 @@ class HttpSession:
         self,
         method: str,
         path: str,
-        body: bytes | None = None,
+        body: bytes | BinaryIO | None = None,
         headers: dict[str, str] | None = None,
     ) -> tuple[int, bytes]:
-        """Send *method* to *path* and return ``(status, body_bytes)``."""
+        """Send *method* to *path* and return ``(status, body_bytes)``.
+
+        *body* may be an open binary file: ``http.client`` sends it as it reads it, so a large
+        upload is never held in memory. A retry starts it again from where it was.
+        """
         # Avoid double slashes when path_prefix is empty or path starts with /
         full_path = "{}/{}".format(self._path_prefix, path.lstrip("/"))
         merged = self.request_headers(headers)
         safe = method.upper() in _SAFE_METHODS
+        start = body.tell() if hasattr(body, "read") and body.seekable() else None  # type: ignore[union-attr]
         with self._lock:
             if (
                 self._conn is not None
@@ -459,6 +465,12 @@ class HttpSession:
                 try:
                     if self._conn is None:
                         self._connect()
+                    if start is not None:
+                        body.seek(start)  # type: ignore[union-attr]
+                    elif attempt > 0 and hasattr(body, "read"):
+                        raise http.client.HTTPException(
+                            "the upload can't be sent again: its stream can't seek"
+                        )
                     self._conn.request(method, full_path, body=body, headers=merged)  # type: ignore[union-attr]
                     sent = True
                     resp = self._conn.getresponse()  # type: ignore[union-attr]
@@ -551,11 +563,11 @@ class ApiGroupBase:
         """Send an HTTP request via the shared persistent session."""
         if headers is None:
             headers = {}
-        encoded: bytes | None
+        encoded: bytes | BinaryIO | None
         if body is None:
             encoded = None
-        elif isinstance(body, bytes):
-            encoded = body
+        elif isinstance(body, bytes) or hasattr(body, "read"):
+            encoded = body  # type: ignore[assignment]
         else:
             encoded = json.dumps(body).encode("utf-8")
             headers = {**headers, "Content-Type": "application/json"}

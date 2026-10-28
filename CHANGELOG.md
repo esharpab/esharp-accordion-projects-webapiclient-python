@@ -28,6 +28,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   (`ResourcesGroup.CAPABILITY_CHECK_LIFETIME_S`) and redone after any failed call, so a station rolled
   back to older firmware is caught; and "any age" (`max_age_ms` 0) is sent as `2**31 - 1` ms, so such a
   station would answer from its cache rather than force a read of every name. Existing calls are unchanged.
+- `channels.upload_bytestream(name, image, target="sram", file_name=None, force=False)`: sends a file to a
+  ByteStream file channel (`POST /api/channels/bytestream`, firmware 7.0.5), e.g. an FPGA image to MicroHAPS's
+  `JTAG.FPGA_IMAGE`, loaded into the KU5P's SRAM by openFPGALoader without Vivado. `image` is bytes, an open
+  binary file or a path; a file is sent as it is read, not read whole.
+- `channels.bytestream_status(name)`, `channels.wait_bytestream(name, timeout)` and
+  `channels.load_fpga_image(name, image)` (upload and wait; raises `ByteStreamLoadError` when the load fails);
+  `ByteStreamStatus` and `ByteStreamImage`.
+- The transport sends an open binary file as a request body; a retried request sends it again from its start.
 
 ### Compatibility
 
