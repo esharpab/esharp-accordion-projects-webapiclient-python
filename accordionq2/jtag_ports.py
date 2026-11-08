@@ -81,6 +81,26 @@ class JtagXvc:
 
 
 @dataclass(frozen=True, slots=True)
+class JtagDisturbed:
+    """A JTAG port's disturbances: hints that the FPGA may have been reconfigured."""
+
+    #: How many since the port object was made (a MicroHAPS use counts twice).
+    count: int = 0
+    #: The last one: ``"MicroHAPS's use: a POWER cycle"``; None while the count is 0.
+    why: str | None = None
+    #: When (ISO 8601), or None.
+    since: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> JtagDisturbed:
+        return cls(
+            count=int(data.get("count") or 0),
+            why=data.get("why"),
+            since=data.get("since"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class JtagPortState:
     """A JTAG port's state: the value of its ``<port>.State`` channel."""
 
@@ -104,11 +124,17 @@ class JtagPortState:
     xvc: JtagXvc = field(default_factory=JtagXvc)
     #: When the state last changed (ISO 8601), or None.
     since: str | None = None
+    #: 16 hex digits, new for every port object (its owner loaded again); "" from older firmware.
+    incarnation: str = ""
+    #: What may have reconfigured the FPGA behind it (the firmware's Drummer/PACKAGES.md 4.4);
+    #: None from older firmware.
+    disturbed: JtagDisturbed | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> JtagPortState:
         holder = data.get("holder")
         xvc = data.get("xvc")
+        disturbed = data.get("disturbed")
         return cls(
             port=str(data.get("port") or ""),
             owner=str(data.get("owner") or ""),
@@ -121,6 +147,8 @@ class JtagPortState:
             max_tck_hz=float(data.get("max_tck_hz") or 0.0),
             xvc=JtagXvc.from_dict(xvc) if isinstance(xvc, dict) else JtagXvc(),
             since=data.get("since"),
+            incarnation=str(data.get("incarnation") or ""),
+            disturbed=JtagDisturbed.from_dict(disturbed) if isinstance(disturbed, dict) else None,
         )
 
     @classmethod

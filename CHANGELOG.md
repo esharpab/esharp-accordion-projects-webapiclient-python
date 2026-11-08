@@ -6,6 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [7.4.0] – 2026-11-08
+
+### Added
+
+- **The Drummer package library** (firmware with `Target.Library`): `DrummerTarget.library()`, `select_package(sha256)`
+  (a full SHA-256 or 8 or more of its first hex digits), `unselect_package()`, `delete_package(sha256)` (409 while a
+  configured instance selects it) and `upload_package(path, timeout=60)` (`channels.upload_bytestream` on
+  `Target.Package`, then `wait_bytestream`: done when the package is kept and selected; the connect and any load
+  follow).
+- `DrummerTarget.build()`: `Target.Status`'s `build` (which build the FPGA runs, which build the package has, which
+  rule decided).
+- `JtagPortState.incarnation` and `disturbed` (`JtagDisturbed`: `count`, `why`, `since`): what may have reconfigured
+  the FPGA behind the port.
+
+### Compatibility
+
+- Against firmware without `Target.Library` the library calls raise the station's 404 for an unknown channel; `build()`
+  returns None; `incarnation` is empty and `disturbed` None.
+
+---
+
 ## [7.3.0] – 2026-11-08
 
 ### Added

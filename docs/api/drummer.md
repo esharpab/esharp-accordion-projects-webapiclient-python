@@ -38,6 +38,12 @@ what the page does. The operations, their arguments and their results are listed
 | `net(name)` | `str` | `"Drummer." + name`. |
 | `port()` | `str` | `Target.Port`: the JTAG port bound now (`"MicroHAPS.JTAG.A"`), `""` when unbound. |
 | `bind_port(port)` | `None` | Bind the instance to that port now (`""` or None unbinds). 409 when another instance claims it, or while a load, the self-test or a job holds the TAP. Not saved: the module's `Port` setting is the binding at its next load. |
+| `library()` | `dict` | `Target.Library`: the station's package library and this instance's selection (below). From the module's memory, no scan. |
+| `select_package(sha256)` | `None` | `Target.Select`: select a library package for this instance, by its SHA-256 or 8 or more of its first hex digits. |
+| `unselect_package()` | `None` | `Target.Select` = `""`: back to the `PackagePath` setting, or to no package. |
+| `delete_package(sha256)` | `None` | `Target.Delete`: delete a library package. 409 while a configured instance selects it (the message names the instances). |
+| `upload_package(path, timeout=60)` | `ByteStreamStatus` | Upload a `.drummer` package to `Target.Package` and wait until it is kept and selected (`done`) or refused (`failed`, returned). The connect and any load follow. |
+| `build()` | `dict \| None` | `Target.Status`'s `build`: which build the FPGA runs, which build the package has, which rule decided. None on firmware without build identity. |
 
 A Drummer instance is named as it is configured in modules.config (`Drummer`, `DUT_A`): that name is its channels'
 prefix (`Drummer.Target.Status`) and `DrummerModuleRef.prefix`. An instance whose port is held by someone else (an
@@ -55,6 +61,47 @@ The ports are [`client.jtag_ports`](jtag-ports.md).
   "wait_ms": 10000}` until the job has ended. After `timeout_s` it raises `TimeoutError` with the job's ticket; the
   job goes on in the module, and its result can be fetched with that ticket (only the caller that started the job has
   it; `Target.Jobs` shows the id before its dot) for 5 minutes after it ends.
+
+## The package library
+
+Firmware with the library (`Target.Library`; older firmware answers 404 for these channels). The station keeps every
+uploaded `.drummer` package once, by its SHA-256; each instance has one selected package, kept across restarts, and
+that is what it loads.
+
+```python
+t = client.drummer.target("Drummer")
+
+# The developer flow: upload, and the station keeps it, selects it, loads its bitfile when the FPGA does not run that
+# build (LoadOnSelect mismatch), runs discovery and connects
+up = t.upload_package("build/microhaps_mem.drummer")
+if up.state != "done":
+    raise RuntimeError(up.message)                       # refused: the old selection stays
+
+# The upload's wait ends at the selection: the connect and any load follow
+while t.status()["state"] in ("connecting", "loading"):
+    time.sleep(0.5)
+print(t.build()["text"])
+# FPGA runs build unknown · package build none · the package's build: this station loaded ... (marker)
+
+# Back to a known-good build: one call
+for p in t.library()["packages"]:
+    print(p["sha256"][:8], p["file"], p["uploaded"], p["usr_access_time"], "selected by", p["selected_by"])
+t.select_package("4f0c1a2b")
+
+t.delete_package("9a1b2c3d")                             # 409 while a configured instance selects it
+```
+
+`build["rule"]` says what decided whether the FPGA runs the package's build: `usr_access` (the FPGA's USR_ACCESS against
+the stamp in the bitfile, a bitfile built with `BITSTREAM.CONFIG.USR_ACCESS TIMESTAMP`), `marker` (this station's
+record of what it loaded on the port, forgotten at anything it sees that may reconfigure the FPGA), `design_id`,
+`discovery`, `device`, or `neither` (`runs_package` None: can't tell). `Target.Status` also has `package` (what the
+instance runs), `load_on_select` and `warnings` (instruments without a register map in the package, driver versions,
+a bitfile held back).
+
+An instrument whose register map is not in the package is **opaque** (`"opaque": True` in `info()`): it stays in the
+scan path, its `snapshot` has its raw words, and only `read`, `scan` without fields, `reset_instrument` and
+`clear_errors` work on it. One whose class version has no driver (`"driver": "generic"`) has its register channels and
+the generic operations.
 
 ## Errors
 

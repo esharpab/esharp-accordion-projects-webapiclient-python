@@ -38,7 +38,7 @@ from .firmware import (
     FirmwareState,
     FirmwareUpdateStatus,
 )
-from .jtag_ports import JtagHolder, JtagPort, JtagPortState, JtagXvc
+from .jtag_ports import JtagDisturbed, JtagHolder, JtagPort, JtagPortState, JtagXvc
 from .lease import LeaseDto
 from .models import (
     AppLicenseDto,
@@ -111,6 +111,7 @@ __all__ = [
     "FirmwareState",
     "FirmwareUpdateStatus",
     "InstrumentDto",
+    "JtagDisturbed",
     "JtagHolder",
     "JtagPort",
     "JtagPortState",

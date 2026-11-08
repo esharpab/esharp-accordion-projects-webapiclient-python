@@ -190,6 +190,30 @@ class TestJtagPorts:
             port_name("  ")
 
 
+class TestDisturbed:
+    def test_the_state_carries_the_ports_incarnation_and_disturbances(self):
+        data = {
+            **PORT_STATE,
+            "incarnation": "9f2c4e1a7b3d5f60",
+            "disturbed": {
+                "count": 7,
+                "why": "MicroHAPS's use: a POWER cycle",
+                "since": "2026-11-08T15:02:00.0000000Z",
+            },
+        }
+        s = JtagPortState.from_dict(data)
+        assert s.incarnation == "9f2c4e1a7b3d5f60"
+        assert s.disturbed is not None
+        assert s.disturbed.count == 7
+        assert s.disturbed.why == "MicroHAPS's use: a POWER cycle"
+        assert s.disturbed.since == "2026-11-08T15:02:00.0000000Z"
+
+    def test_older_firmware_has_none(self):
+        s = JtagPortState.from_dict(PORT_STATE)
+        assert s.incarnation == ""
+        assert s.disturbed is None
+
+
 class TestDrummerPort:
     def test_port_and_bind_port_use_target_port(self):
         session = make_session([(200, {"value": " MicroHAPS.JTAG.A "}), (200, {}), (200, {})])

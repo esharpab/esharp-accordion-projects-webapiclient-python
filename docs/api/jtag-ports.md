@@ -62,6 +62,8 @@ client.jtag_ports.set_xvc("MicroHAPS.JTAG.A", True)    # an Admin key
 | `max_tck_hz` | `max_tck_hz` | The fastest TCK a holder gets |
 | `xvc` | `xvc` | `JtagXvc`: `enabled`, `engine`, `listen`, `allow`, `client`, `waiting`, `sessions`, `last_end` |
 | `since` | `since` | When the state last changed |
+| `incarnation` | `incarnation` | 16 hex digits, new for every port object (its owner loaded again); `""` from older firmware |
+| `disturbed` | `disturbed` | `JtagDisturbed`: what may have reconfigured the FPGA behind it: `count`, `why` (the last one: `"MicroHAPS's use: a POWER cycle"`, `"an XVC session from 192.168.0.10"`), `since`; None from older firmware. A Drummer instance forgets what it loaded when this count moves |
 
 ## Holders, and who waits
 

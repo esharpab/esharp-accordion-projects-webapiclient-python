@@ -118,7 +118,7 @@ API; the main ones are below, and the
 [documentation](https://esharp-accordion-projects-webapiclient-python.readthedocs.io/en/latest/)
 covers them all, including calibration, instruments, events and
 subscriptions, the audit log, and `client.drummer` (FPGA instruments over
-JTAG: `client.drummer.target("Drummer").call("CLK", "clock_measure", gate=1_200_000, channel=1)`).  All methods are **synchronous** and raise
+JTAG: `client.drummer.target("Drummer").call("CLK", "clock_measure", gate=1_200_000, channel=1)`; its package library: `upload_package`, `library`, `select_package`, `delete_package`, `build`).  All methods are **synchronous** and raise
 `AccordionQ2ApiError` on HTTP errors.
 
 ### `client.connection` &mdash; Connection Status

@@ -11,6 +11,10 @@ the page does::
     t.read("CLK.Freq0")                                                 # "233250000"
     t.write("GPIO.GPIO0", "True")
     t.bind_port("MicroHAPS.JTAG.A")                                     # Target.Port
+    t.upload_package("build/microhaps_mem.drummer")                     # kept, selected, loaded
+    t.library()["packages"]                                             # the station's library
+    t.select_package("4f0c1a2b")                                        # back to a known-good build
+    t.build()["text"]                                                   # which build the FPGA runs
 
 Errors: 400 the request is wrong; **409 busy, try again** (something else holds the JTAG, named
 in the message); 500 an instrument or JTAG fault. All are :class:`AccordionQ2ApiError` with
@@ -20,13 +24,16 @@ in the message); 500 an instrument or JTAG fault. All are :class:`AccordionQ2Api
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from os import PathLike
 from typing import Any, ClassVar
 
 from ._base import ApiGroupBase, HttpSession
 from .capabilities import CapabilitiesDto, CapabilitiesGroup
+from .channels import ByteStreamStatus, ChannelsGroup
 from .exceptions import AccordionQ2ApiError, AccordionQ2NotSupportedError
 from .instruments import InstrumentsGroup
 from .resources import ResourcesGroup
@@ -99,10 +106,17 @@ class DrummerTarget:
     #: The overall timeout of :meth:`call` when none is given, in seconds.
     DEFAULT_TIMEOUT_S: ClassVar[float] = 60.0
 
-    def __init__(self, prefix: str, resources: ResourcesGroup, check: _TransactCheck) -> None:
+    def __init__(
+        self,
+        prefix: str,
+        resources: ResourcesGroup,
+        check: _TransactCheck,
+        channels: ChannelsGroup | None = None,
+    ) -> None:
         self.prefix = prefix
         self._resources = resources
         self._check = check
+        self._channels = channels
         self._clock: Callable[[], float] = time.monotonic
 
     def __repr__(self) -> str:
@@ -141,6 +155,67 @@ class DrummerTarget:
         the binding at its next load. The station's ports are ``client.jtag_ports.get_all()``.
         """
         self.write("Target.Port", (port or "").strip())
+
+    # -- the package library and build identity (the firmware's Drummer/PACKAGES.md) -----------------
+    def library(self) -> dict[str, Any]:
+        """``Target.Library``: the station's package library and this instance's selection, from the
+        module's memory (no scan): ``dir``, ``bytes``, ``free_bytes``, ``floor_bytes``, ``selection``
+        (``source`` "library", "PackagePath" or "none") and ``packages``, newest upload first.
+
+        404 on firmware without the library.
+        """
+        return self._object("Target.Library")
+
+    def select_package(self, sha256: str) -> None:
+        """Select a library package for this instance (``Target.Select``, Operator): its SHA-256 or 8
+        or more of its first hex digits.
+
+        Kept across restarts. The design's channels are built again, and under the module's
+        ``LoadOnSelect`` (default ``mismatch``) its bitfile is loaded when the FPGA does not run that
+        build or the station can't tell. Returns before the connect: follow :meth:`status` and
+        ``Target.LoadStatus``. 400 for an unknown or ambiguous one or a package that does not load
+        (the old selection stays); 409 while a bitfile load or the self-test runs or the JTAG is
+        held. :class:`ValueError` (nothing sent) unless it is 8 to 64 hex digits.
+        """
+        self.write("Target.Select", _sha_text(sha256))
+
+    def unselect_package(self) -> None:
+        """Unselect (``Target.Select`` = ``""``): the instance falls back to its ``PackagePath`` setting
+        (under ``LoadOnSelect``), or to no package (the design's channels go, nothing is loaded)."""
+        self.write("Target.Select", "")
+
+    def delete_package(self, sha256: str) -> None:
+        """Delete a package from the station's library (``Target.Delete``, Operator).
+
+        409 while a configured instance selects it (the message names the instances); 400 for an
+        unknown or ambiguous one. It can't be undone: upload the file again.
+        :class:`ValueError` (nothing sent) unless it is 8 to 64 hex digits.
+        """
+        self.write("Target.Delete", _sha_text(sha256))
+
+    def upload_package(self, path: str | PathLike[str], timeout: float = 60.0) -> ByteStreamStatus:
+        """Upload a ``.drummer`` package to this instance (``Target.Package``, the developer flow).
+
+        The station checks it, keeps it in its library, selects it and, under ``LoadOnSelect``
+        ``mismatch``, loads its bitfile when the FPGA does not run that build, then discovers and
+        connects. Returns when the package is kept and selected (state ``done``) or refused
+        (``failed``, returned, not raised, with the reason in ``message``); the connect and any load
+        follow: :meth:`status`, :meth:`build`, ``Target.LoadStatus``. :class:`TimeoutError` after
+        *timeout* seconds.
+        """
+        if self._channels is None:
+            raise RuntimeError("this DrummerTarget was not made by client.drummer.target(prefix)")
+        channel = self.net("Target.Package")
+        self._channels.upload_bytestream(channel, path)
+        return self._channels.wait_bytestream(channel, timeout=timeout)
+
+    def build(self) -> dict[str, Any] | None:
+        """``Target.Status``'s ``build``: which build the FPGA runs and which the selected package has,
+        and which rule decided (``fpga``, ``package``, ``marker``, ``held_back``, ``runs_package`` True,
+        False or None, ``rule``, ``text``, ``checked``, ``stale``). None on firmware without build
+        identity."""
+        value = self.status().get("build")
+        return value if isinstance(value, dict) else None
 
     def _json(self, name: str) -> object:
         text = self.read(name)
@@ -272,6 +347,19 @@ class DrummerTarget:
         return value
 
 
+_SHA_TEXT = re.compile(r"[0-9a-fA-F]{8,64}")
+
+
+def _sha_text(sha256: str) -> str:
+    """A SHA-256 or 8+ of its first hex digits, as Target.Select and Target.Delete take it."""
+    s = (sha256 or "").strip()
+    if not _SHA_TEXT.fullmatch(s):
+        raise ValueError(
+            f"{s!r} is not a SHA-256: give the package's SHA-256 or 8 or more of its first hex digits"
+        )
+    return s
+
+
 def _running_job(result: dict[str, Any]) -> str | None:
     """A running job's id: ``{"job": id, "state": "running", ...}``; else None."""
     job = result.get("job")
@@ -287,6 +375,7 @@ class DrummerGroup(ApiGroupBase):
         super().__init__(session)
         self._resources = ResourcesGroup(session)
         self._instruments = InstrumentsGroup(session)
+        self._channels = ChannelsGroup(session)
         self._check = _TransactCheck(CapabilitiesGroup(session))
 
     def find(self) -> list[DrummerModuleRef]:
@@ -323,4 +412,4 @@ class DrummerGroup(ApiGroupBase):
         p = prefix.strip().rstrip(".")
         if not p:
             raise ValueError('give the module\'s prefix, e.g. "Drummer"')
-        return DrummerTarget(p, self._resources, self._check)
+        return DrummerTarget(p, self._resources, self._check, self._channels)

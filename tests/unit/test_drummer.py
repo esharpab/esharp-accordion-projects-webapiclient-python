@@ -256,6 +256,95 @@ class TestFind:
         assert DrummerGroup(session).find() == [DrummerModuleRef("Drummer", "Drummer")]
 
 
+SHA = "4f0c1a2b" + "0" * 52 + "beef"
+
+
+def _writes(session: object) -> list[tuple[str, str]]:
+    return [
+        (body["Name"], body["Value"])
+        for _, path, body in _sent(session)
+        if path == "api/resources/value/set"
+    ]
+
+
+class TestLibrary:
+    """The package library and build identity (the firmware's Drummer/PACKAGES.md section 8)."""
+
+    def test_library_reads_target_library(self):
+        library = {
+            "dir": "/home/accordion/drummer/library",
+            "selection": {"source": "library", "sha256": SHA},
+            "packages": [{"sha256": SHA, "file": "mh.drummer", "selected_by": ["Drummer"]}],
+        }
+        session = make_session([(200, _value(library))])
+        assert DrummerGroup(session).target("Drummer").library() == library
+        assert _sent(session)[0][2]["Name"] == "Drummer.Target.Library"
+
+    def test_select_unselect_and_delete_write_their_channels(self):
+        session = make_session([(200, {}), (200, {}), (200, {}), (200, {})])
+        t = DrummerGroup(session).target("Drummer")
+        t.select_package(SHA)
+        t.select_package("4F0C1A2B")
+        t.unselect_package()
+        t.delete_package(" 9a1b2c3d ")
+        assert _writes(session) == [
+            ("Drummer.Target.Select", SHA),
+            ("Drummer.Target.Select", "4F0C1A2B"),
+            ("Drummer.Target.Select", ""),
+            ("Drummer.Target.Delete", "9a1b2c3d"),
+        ]
+
+    @pytest.mark.parametrize("bad", ["4f0c", "../x", "4f0c 1a2b", "", "a" * 65, "zzzzzzzz"])
+    def test_a_sha_text_that_is_not_8_to_64_hex_digits_is_refused_before_anything_is_sent(self, bad):
+        session = make_session([])
+        t = DrummerGroup(session).target("Drummer")
+        with pytest.raises(ValueError, match="is not a SHA-256"):
+            t.select_package(bad)
+        with pytest.raises(ValueError, match="is not a SHA-256"):
+            t.delete_package(bad)
+        assert _sent(session) == []
+
+    def test_a_delete_refused_while_selected_is_a_409_naming_the_instances(self):
+        session = make_session(
+            [(409, {"error": "4f0c1a2b (mh.drummer) is selected by Drummer, DUT_A: select another package there first"})]
+        )
+        with pytest.raises(AccordionQ2ApiError) as e:
+            DrummerGroup(session).target("Drummer").delete_package(SHA)
+        assert e.value.status_code == 409
+        assert "selected by Drummer, DUT_A" in str(e.value)
+
+    def test_build_is_target_status_build(self):
+        build = {"rule": "marker", "runs_package": True, "text": "FPGA runs build unknown"}
+        session = make_session([(200, _value({"state": "connected", "build": build}))])
+        assert DrummerGroup(session).target("Drummer").build() == build
+        assert _sent(session)[0][2]["Name"] == "Drummer.Target.Status"
+
+    def test_build_is_none_on_firmware_without_build_identity(self):
+        session = make_session([(200, _value({"state": "connected"}))])
+        assert DrummerGroup(session).target("Drummer").build() is None
+
+    def test_upload_package_posts_to_target_package_and_waits_until_it_is_kept(self, tmp_path):
+        file = tmp_path / "mh.drummer"
+        file.write_bytes(b"PK\x03\x04")
+        session = make_session(
+            [
+                (202, {"state": "validating"}),
+                (200, {"state": "done", "message": "mh.drummer: kept in the library as 4f0c1a2b (new), selected"}),
+            ]
+        )
+        status = DrummerGroup(session).target("Drummer").upload_package(file)
+
+        assert status.state == "done"
+        assert "kept in the library" in status.message
+        calls = session.request.call_args_list  # type: ignore[attr-defined]
+        assert calls[0].args[0] == "POST"
+        assert "api/channels/bytestream?name=Drummer.Target.Package" in calls[0].args[1]
+        assert "fileName=mh.drummer" in calls[0].args[1]
+        assert calls[1].args[0] == "GET"
+        assert calls[1].args[1] == "api/channels/bytestream?name=Drummer.Target.Package"
+        assert len(calls) == 2
+
+
 def test_the_client_has_the_group():
     from accordionq2 import AccordionQ2Client
 
