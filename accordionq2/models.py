@@ -118,6 +118,50 @@ class PhysicalModuleDto:
 
 
 @dataclass(frozen=True, slots=True)
+class ModulePresenceDto:
+    """One module present on the station (``GET api/modules/present``, firmware with stable
+    module names): a hardware module in the backplane or a software module loaded from
+    modules.config or boot.config. A module's channels are those whose net name starts with
+    ``prefix + "."``."""
+
+    #: ``"hardware"`` or ``"software"``.
+    kind: str = ""
+    #: The slot path (``"0.2"``) or the configured name (``"MicroHAPS"``): what the Web UI's
+    #: ``channels?module=`` takes.
+    address: str = ""
+    #: What its net names start with: ``"0.2.ESH10000560"``, ``"MicroHAPS"``.
+    prefix: str = ""
+    #: The product name (hardware) or the module's name (software).
+    name: str = ""
+    #: Hardware only.
+    product_id: str | None = None
+    #: Hardware only.
+    revision: int | None = None
+    #: Hardware only.
+    serial_number: str | None = None
+    #: Software only: ``"MicroHapsHandler.MicroHaps"``.
+    class_name: str | None = None
+
+    @property
+    def is_hardware(self) -> bool:
+        return self.kind.lower() == "hardware"
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ModulePresenceDto:
+        revision = data.get("revision")
+        return cls(
+            kind=str(data.get("kind") or ""),
+            address=str(data.get("address") or ""),
+            prefix=str(data.get("prefix") or ""),
+            name=str(data.get("name") or ""),
+            product_id=data.get("productId"),
+            revision=int(revision) if revision is not None else None,
+            serial_number=data.get("serialNumber"),
+            class_name=data.get("className"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class PhysicalSystemDto:
     """Physical hardware system description (topology)."""
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ._base import ApiGroupBase
-from .models import AppLicenseDto, ModuleSettingsDto, PhysicalSystemDto
+from .models import AppLicenseDto, ModulePresenceDto, ModuleSettingsDto, PhysicalSystemDto
 
 
 class ModulesGroup(ApiGroupBase):
@@ -38,6 +38,17 @@ class ModulesGroup(ApiGroupBase):
         result = self._get_json("api/modules/physical-system")
         assert isinstance(result, dict)
         return PhysicalSystemDto.from_dict(result)
+
+    def get_present(self) -> list[ModulePresenceDto]:
+        """Every module present: the hardware in the backplane by slot, then the software modules
+        loaded by name, as the Web UI's status bar lists them (``GET api/modules/present``).
+
+        Firmware before stable module names answers 404 (:class:`AccordionQ2ApiError`);
+        :meth:`get_physical_system` lists the hardware there.
+        """
+        data = self._get_json("api/modules/present")
+        assert isinstance(data, list)
+        return [ModulePresenceDto.from_dict(m) for m in data]
 
     def get_licensed_apps(self) -> list[AppLicenseDto]:
         """Return licensed applications only."""

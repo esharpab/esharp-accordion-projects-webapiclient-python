@@ -13,7 +13,7 @@ from accordionq2._base import HttpSession
 from accordionq2.channels import ChannelsGroup
 from accordionq2.exceptions import AccordionQ2ApiError
 
-CHANNEL = "1.MicroHAPS.JTAG.FPGA_IMAGE"
+CHANNEL = "MicroHAPS.JTAG.FPGA_IMAGE"
 
 
 class FakeSession(HttpSession):
@@ -40,7 +40,7 @@ def test_upload_bytes_posts_octets_with_name_file_and_target():
     method, path, body, headers = session.sent[0]
     assert method == "POST"
     assert path.startswith(
-        "api/channels/bytestream?name=1.MicroHAPS.JTAG.FPGA_IMAGE&fileName=top.bit&target=sram"
+        "api/channels/bytestream?name=MicroHAPS.JTAG.FPGA_IMAGE&fileName=top.bit&target=sram"
     )
     assert "force" not in path
     assert body == b"\x01\x02\x03"

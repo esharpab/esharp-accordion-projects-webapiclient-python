@@ -109,7 +109,7 @@ MicroHAPS has a ByteStream channel `JTAG.FPGA_IMAGE` (Unit `file:FPGA image`). I
 client sends the file to `POST /api/channels/bytestream`, and the station checks it and loads it into the KU5P's SRAM
 with openFPGALoader, without Vivado and whether or not the XVC server is on. `resources.set_values` on this channel is
 refused (400). `image` is the bytes, an open binary file or a path; a file is sent as it is read, not read whole.
-Loading needs the Operator role, as switching `XVC_ENABLE` on does: the station checks the part (XCKU5P-FFVB676) and
+Loading needs the Operator role (the XVC switch `MicroHAPS.JTAG.A.Xvc` needs Admin): the station checks the part (XCKU5P-FFVB676) and
 the IDCODE, not what the design drives. Writing the configuration flash is not in 7.0.5 (`target="flash"` gives 501).
 
 ```python
@@ -117,12 +117,12 @@ from accordionq2 import AccordionQ2Client, ByteStreamLoadError
 
 with AccordionQ2Client("http://station:5000", api_key="acc_...") as client:
     try:
-        status = client.channels.load_fpga_image("1.MicroHAPS.JTAG.FPGA_IMAGE", "hci_mig_top.bit")
+        status = client.channels.load_fpga_image("MicroHAPS.JTAG.FPGA_IMAGE", "hci_mig_top.bit")
     except ByteStreamLoadError as error:
         print("failed:", error.status.message)   # e.g. "...is for xcku3p-ffva676-1-e, not the XCKU5P..."
         raise
     print(status.image.file_name, status.image.sha256, status.image.duration_ms, "ms")
-    client.resources.set_value("1.MicroHAPS.HCI.Scan", "True")   # the new design's HCI devices
+    client.resources.set_value("MicroHAPS.HCI.Scan", "True")   # the new design's HCI devices
 ```
 
 | Status | When |

@@ -8,10 +8,11 @@ from .boot import (
     BootService,
     BootWifi,
 )
-from .capabilities import CapabilitiesDto
+from .capabilities import CapabilitiesDto, NamesCapability
 from .certificates import normalize_sha256, sha256_of
 from .channels import ByteStreamImage, ByteStreamLoadError, ByteStreamStatus
 from .client import AccordionQ2Client
+from .drummer import DrummerModuleRef, DrummerTarget
 from .enums import (
     AppTypes,
     BusActions,
@@ -37,6 +38,7 @@ from .firmware import (
     FirmwareState,
     FirmwareUpdateStatus,
 )
+from .jtag_ports import JtagHolder, JtagPort, JtagPortState, JtagXvc
 from .lease import LeaseDto
 from .models import (
     AppLicenseDto,
@@ -49,6 +51,7 @@ from .models import (
     ChannelLookupRequest,
     ConnectionStatusDto,
     InstrumentDto,
+    ModulePresenceDto,
     ModuleSettingsDto,
     NumericMeasureResultDto,
     NumericResultChannelDto,
@@ -96,6 +99,8 @@ __all__ = [
     "ClockStatus",
     "ConnectionStatusDto",
     "DirectionTypes",
+    "DrummerModuleRef",
+    "DrummerTarget",
     "EventStream",
     "FileEntry",
     "FileListing",
@@ -106,10 +111,16 @@ __all__ = [
     "FirmwareState",
     "FirmwareUpdateStatus",
     "InstrumentDto",
+    "JtagHolder",
+    "JtagPort",
+    "JtagPortState",
+    "JtagXvc",
     "LeaseDto",
+    "ModulePresenceDto",
     "ModuleSettingsDto",
     "ModuleStatus",
     "MpioUsageTypes",
+    "NamesCapability",
     "NumericMeasureResultDto",
     "NumericResultChannelDto",
     "PhysicalModuleDto",

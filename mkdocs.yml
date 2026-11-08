@@ -46,6 +46,8 @@ nav:
       - Numeric Results: api/numeric-results.md
       - Calibration: api/calibration.md
       - Instruments: api/instruments.md
+      - Drummer: api/drummer.md
+      - JTAG ports: api/jtag-ports.md
       - Events and subscriptions: api/events.md
       - Lease: api/lease.md
       - System and boot.config: api/system.md

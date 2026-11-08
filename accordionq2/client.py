@@ -10,10 +10,12 @@ from .capabilities import CapabilitiesGroup
 from .channels import ChannelsGroup
 from .comm import CommGroup
 from .connection import ConnectionGroup
+from .drummer import DrummerGroup
 from .events import EventsGroup
 from .files import FilesGroup
 from .firmware import FirmwareGroup
 from .instruments import InstrumentsGroup
+from .jtag_ports import JtagPortsGroup
 from .lease import LeaseGroup
 from .media import MediaGroup
 from .modules import ModulesGroup
@@ -118,6 +120,8 @@ class AccordionQ2Client:
         self.audit = AuditGroup(self._session)
         self.capabilities = CapabilitiesGroup(self._session)
         self.instruments = InstrumentsGroup(self._session)
+        self.drummer = DrummerGroup(self._session)
+        self.jtag_ports = JtagPortsGroup(self._session)
         self.events = EventsGroup(self._session)
         self.subscriptions = SubscriptionsGroup(self._session)
         self.lease = LeaseGroup(self._session)

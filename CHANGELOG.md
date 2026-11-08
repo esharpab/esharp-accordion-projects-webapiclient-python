@@ -6,6 +6,71 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [7.3.0] – 2026-11-08
+
+### Added
+
+- **Stable module names** (firmware with `names.stable` in its capabilities): a software module's net names start with
+  its configured name (`MicroHAPS.HCI.Scan`, `Drummer.Target.Status`) instead of a load-order number
+  (`1.MicroHAPS.HCI.Scan`); hardware keeps its slot address (`0.2.ESH10000560.CH1`).
+- `modules.get_present()` (`GET api/modules/present`): every module present, the hardware in the backplane by slot and
+  the software modules loaded by name (`ModulePresenceDto`: `kind`, `address`, `prefix`, `name`, `product_id`,
+  `revision`, `serial_number`, `class_name`, `is_hardware`). A module's channels are those whose net name starts with
+  `prefix + "."`.
+- **`client.jtag_ports`** (`JtagPortsGroup`): the station's JTAG ports, found by their State channels (Unit
+  `jtag-port`). `get_all()` with each port's parsed state (`JtagPort`, `JtagPortState`, `JtagHolder`, `JtagXvc`: free,
+  held or down, the holder, the bound Drummer instance, the XVC server), `get_state(port)`, `set_xvc(port, on)`
+  (Admin). docs/api/jtag-ports.md.
+- `DrummerTarget.port()` and `bind_port(port)`: the instance's `Target.Port` (409 when another instance claims the
+  port).
+- `CapabilitiesDto.names` (`NamesCapability`: `stable`, `old_names_accepted`, `legacy_prefixes`, `legacy_positions`),
+  for a script that translates the names it stored.
+
+### Changed
+
+- The examples, docstrings and docs use the stable names: `Drummer.LA.Call` for `3.Drummer.LA.Call`,
+  `Drummer.GPIO.GPIO0` for a GPIO pin, `MicroHAPS.JTAG.FPGA_IMAGE`. `drummer.find()` is unchanged: it finds the
+  instances by their Instrument channel, whatever they are named; its tests use the new names.
+
+### Compatibility
+
+- Compatible with 7.2.0. `get_present()` answers 404 on firmware before stable names (`get_physical_system()` lists the
+  hardware there); `jtag_ports.get_all()` is empty there, and `names` is None.
+- A script that stored old net names and compares them with `channels.get_all()` finds no match on the new firmware:
+  the station accepts an old name in a request (with a warning line and the header `X-Accordion-Old-Names`) for two
+  releases, but a list comparison never meets that translation.
+
+---
+
+## [7.2.0] – 2026-11-07
+
+### Added
+
+- **`client.drummer`**: the Drummer modules, which reach IEEE 1687 instruments in an FPGA over JTAG. `find()` lists
+  them as `DrummerModuleRef` (by the Instrument of type `Drummer`, else by `Target.Status` beside `Target.Package`);
+  `target("3.Drummer")` gives a `DrummerTarget`.
+- `DrummerTarget.call(instrument, name, args=None, /, *, timeout_s=60.0, **kwargs)` runs an instrument operation
+  (`clock_measure`, `mmcm_set`, `mem_start`, ...) as a transaction on its Call channel (`3.Drummer.MEM.Call`) and
+  returns the result as a dict (with the module's `ms` and `seq`). The instrument is a segment or a SIB (`"MEM"`,
+  `"SIB_MEM"`). The method's own parameters are positional, so an argument named `op`, `name` or `instrument` passes
+  through. An operation that becomes a job is followed (`{"call": "job"}`, `wait_ms` 10000) to its end; after
+  `timeout_s` a `TimeoutError` names the job's id, and the job goes on in the module. `module_call(name, ...)` for
+  `Target.Call`.
+- `DrummerTarget.status()`, `info()`, `attention()`, `jobs()`, `snapshot(instrument)`, `read(name)`,
+  `write(name, value)` and `net(name)`.
+- `CapabilitiesDto.RESOURCES_TRANSACT` (`"resources.transact"`).
+- docs/api/drummer.md.
+
+### Compatibility
+
+- The Drummer calls check `resources.transact` first (kept for 60 s, asked again after a failed call). Without it
+  (older firmware runs transactions for Admin only, under the engine lock) they raise `AccordionQ2NotSupportedError`
+  and send nothing.
+- A 409 (`AccordionQ2ApiError.status_code` 409) is a busy target: try again.
+- Standard library only, as before. Existing calls are unchanged.
+
+---
+
 ## [7.1.0] – 2026-10-28
 
 ### Added

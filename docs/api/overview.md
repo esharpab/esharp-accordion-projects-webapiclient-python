@@ -17,6 +17,8 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
     client.numeric_results   # Fast numeric sampling & statistics
     client.calibration       # Calibration channel read/write
     client.instruments       # Instruments (power supplies) and their function maps
+    client.drummer           # FPGA instruments over JTAG (Drummer modules)
+    client.jtag_ports        # JTAG ports: their state, holder and XVC switch
     client.events            # Event stream: connection, configuration and values events
     client.subscriptions     # Value subscriptions delivered on the event stream
     client.lease             # The control lease: one client at a time changes the station
@@ -41,6 +43,8 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 | [`calibration`](calibration.md) | Read and write Calibration channel tables | [→](calibration.md) |
 | [`events`, `subscriptions`](events.md) | Event stream and value subscriptions | [→](events.md) |
 | [`instruments`](instruments.md) | Instruments such as power-supply outputs, with the channel behind each capability | [→](instruments.md) |
+| [`drummer`](drummer.md) | FPGA instruments over JTAG: operations, jobs, snapshots, semantic channels | [→](drummer.md) |
+| [`jtag_ports`](jtag-ports.md) | The station's JTAG ports: state, holder, bound instance, XVC switch | [→](jtag-ports.md) |
 | [`lease`](lease.md) | Hold control of the station; other clients' changes get 423 | [→](lease.md) |
 | [`system`, `system.boot`](system.md) | Services, reboot, clock, and the start-up configuration (boot.config) | [→](system.md) |
 | [`files`](files.md) | Browse, download, upload, move and delete files in the station's folders | [→](files.md) |

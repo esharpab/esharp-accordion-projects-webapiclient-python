@@ -44,6 +44,8 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 - [Resources](api/resources.md), [Channels](api/channels.md), [Modules](api/modules.md), [Application](api/application.md), [Media](api/media.md), [Connection](api/connection.md)
 - [Calibration](api/calibration.md) &mdash; calibration operations
 - [Instruments](api/instruments.md) &mdash; power-supply outputs and their function maps
+- [Drummer](api/drummer.md) &mdash; FPGA instruments over JTAG: operations as transactions on Call channels
+- [JTAG ports](api/jtag-ports.md) &mdash; the station's JTAG ports, who holds them, their XVC server
 - [Comm (Bus Transactions)](api/comm.md) &mdash; I2C, UART, SPI, Socket
 - [Numeric Results](api/numeric-results.md) &mdash; high-speed sampling
 - [Events and subscriptions](api/events.md) &mdash; event stream and value subscriptions

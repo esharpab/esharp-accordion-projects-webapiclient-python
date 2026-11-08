@@ -117,7 +117,8 @@ The client exposes **groups**, each covering one area of the hardware
 API; the main ones are below, and the
 [documentation](https://esharp-accordion-projects-webapiclient-python.readthedocs.io/en/latest/)
 covers them all, including calibration, instruments, events and
-subscriptions, and the audit log.  All methods are **synchronous** and raise
+subscriptions, the audit log, and `client.drummer` (FPGA instruments over
+JTAG: `client.drummer.target("Drummer").call("CLK", "clock_measure", gate=1_200_000, channel=1)`).  All methods are **synchronous** and raise
 `AccordionQ2ApiError` on HTTP errors.
 
 ### `client.connection` &mdash; Connection Status
@@ -207,6 +208,7 @@ client.channels.configure(ChannelConfigRequest(
 | `unload(module)` | &mdash; | Unload a module. |
 | `configure(module)` | &mdash; | Update module configuration. |
 | `get_physical_system()` | `PhysicalSystemDto` | Hardware topology (host, MAC, modules). |
+| `get_present()` | `list[ModulePresenceDto]` | Every module present, as the Web UI's status bar lists them: hardware by slot, then software by name (`kind`, `address`, `prefix`, `name`, ...). Firmware with stable module names; 404 before. |
 | `get_licensed_apps()` | `list[AppLicenseDto]` | Licensed applications. |
 | `get_all_apps()` | `list[AppLicenseDto]` | All applications. |
 
@@ -218,6 +220,28 @@ for mod in system.modules:
 
 for m in client.modules.get_loaded():
     print(f"  {m.name} (enabled={m.enabled})")
+
+# Since stable module names: a software module's channels start with its name (MicroHAPS.HCI.Scan),
+# a hardware module's with its slot path and product (0.2.ESH10000560.CH1)
+for m in client.modules.get_present():
+    print(f"  {m.address} {m.name}" if m.is_hardware else f"  {m.name} ({m.class_name})")
+```
+
+### `client.jtag_ports` &mdash; JTAG Ports
+
+A JTAG port is a JTAG TAP a module owns (MicroHAPS's FT4232H interface A, a JtagPorts FTDI cable), held by one of
+the owner, an XVC client (Vivado) or a Drummer instance at a time. Firmware with stable module names.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `get_all()` | `list[JtagPort]` | Every port with its parsed state (`JtagPortState`: free, held or down, the holder, the bound instance, the XVC server). |
+| `get_state(port)` | `JtagPortState \| None` | One port's state now. |
+| `set_xvc(port, on)` | &mdash; | Switch the port's XVC server (`<port>.Xvc`); **Admin**. |
+
+```python
+for p in client.jtag_ports.get_all():
+    print(p.name, p.state.state, p.state.bound)
+client.drummer.target("Drummer").bind_port("MicroHAPS.JTAG.A")    # Target.Port
 ```
 
 ---
