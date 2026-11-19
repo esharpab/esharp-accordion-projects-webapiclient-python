@@ -30,6 +30,7 @@ from accordionq2 import (
 
 TLS = Path(__file__).parent / "data" / "tls"
 KEY = "acc_Sentinel0123456789abcdefKEY"
+CHAIN_ROOT = str(TLS / "chain-root.pem")  # above the intermediate that issued chained-*.pem
 
 
 @dataclass
@@ -45,9 +46,14 @@ class _Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     station: Station
     redirect_to: str | None = None
+    events_refusal: tuple[int, dict[str, object]] | None = None
 
     def do_GET(self) -> None:
         self.station.requests.append((self.path, dict(self.headers.items())))
+        if self.path == "/api/events" and self.events_refusal is not None:
+            status, refusal = self.events_refusal
+            self._send(status, json.dumps(refusal).encode())
+            return
         if self.path == "/api/events":
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
@@ -100,12 +106,16 @@ class _Server(ThreadingHTTPServer):
 
 @contextmanager
 def _serve(
-    certificate: str | None, host: str = "127.0.0.1", redirect_to: str | None = None
+    certificate: str | None,
+    host: str = "127.0.0.1",
+    redirect_to: str | None = None,
+    events_refusal: tuple[int, dict[str, object]] | None = None,
 ) -> Iterator[Station]:
     family = socket.AF_INET6 if ":" in host else socket.AF_INET
     station = Station(url="")
     server = _Server(host, family, station)
     server.RequestHandlerClass.redirect_to = redirect_to  # type: ignore[attr-defined]
+    server.RequestHandlerClass.events_refusal = events_refusal  # type: ignore[attr-defined]
     scheme = "http"
     if certificate is not None:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -259,6 +269,23 @@ class TestTrustedCa:
             c.connection.get_status()
         assert self_signed.requests == []
 
+    def test_a_certificate_under_an_intermediate_the_station_sends_is_accepted(self):
+        # A station with a site certificate sends its chain; only the root is configured here.
+        with _serve("chained-server") as station:
+            with AccordionQ2Client(station.url, verify=CHAIN_ROOT, api_key=KEY) as c:
+                assert c.connection.get_status().is_connected
+                with c.events.open() as events:
+                    assert events.stream_id == "s1"
+
+    def test_a_certificate_under_an_intermediate_the_station_does_not_send_is_refused(self):
+        with _serve("chained-leaf-only") as station:
+            with (
+                AccordionQ2Client(station.url, verify=CHAIN_ROOT, api_key=KEY) as c,
+                pytest.raises(ssl.SSLCertVerificationError),
+            ):
+                c.connection.get_status()
+            assert station.requests == []
+
 
 class TestPlainHttp:
     def test_401_from_a_station_in_security_mode_on(self):
@@ -282,6 +309,36 @@ class TestPlainHttp:
                 assert info.value.status_code == 302
                 assert "redirect" in str(info.value)
             assert elsewhere.connections == 0
+
+    def test_the_event_stream_shows_the_stations_308(self):
+        # The body as the WebApi's TransportMiddleware writes it for plain HTTP in security mode On.
+        refusal = {
+            "error": "This station accepts only HTTPS (security mode On). "
+            "Use https://station-12:5001/api/events (port 5001)",
+            "requires": "Https",
+            "httpsUrl": "https://station-12:5001/api/events",
+            "httpsPort": 5001,
+        }
+        with _serve(None, events_refusal=(308, refusal)) as station:
+            with (
+                AccordionQ2Client(station.url, api_key=KEY) as client,
+                pytest.raises(AccordionQ2ApiError) as info,
+            ):
+                client.events.open()
+        assert info.value.status_code == 308
+        assert "https://station-12:5001/api/events" in str(info.value)
+        assert "Check the base URL" not in str(info.value)
+
+    def test_the_event_stream_shows_the_stations_503_reason(self):
+        refusal = {"error": "HTTPS isn't available on this station: no certificate"}
+        with _serve(None, events_refusal=(503, refusal)) as station:
+            with (
+                AccordionQ2Client(station.url, api_key=KEY) as client,
+                pytest.raises(AccordionQ2ApiError) as info,
+            ):
+                client.events.open()
+        assert info.value.status_code == 503
+        assert "HTTPS isn't available on this station: no certificate" in str(info.value)
 
     @needs_ipv6
     def test_ipv6_literal(self):

@@ -38,7 +38,7 @@ The client sends it as the `X-Api-Key` header on every request, the [event strea
 
 ### Redirects
 
-The client doesn't follow HTTP redirects (`http.client` never does), so the key and the lease id go only to the host in the base URL. The station's API never redirects, so a 3xx answer raises an `AccordionQ2ApiError` with that status, usually because the base URL is wrong.
+The client doesn't follow HTTP redirects (`http.client` never does), so the key and the lease id go only to the host in the base URL. The station's API redirects only in security mode On, over plain HTTP from another host: a 308 whose JSON body names the https URL, which the `AccordionQ2ApiError` message shows (the event stream too). Any other 3xx usually means a wrong base URL.
 
 Keep the key out of source code: read it from an environment variable or a secret store. The client never logs it or puts it in an exception message or a `repr()`: `repr(client)` shows only `api_key=set`, and server text that would repeat the key is withheld. The client holds the key as a `str` whose `repr()` is `'<api key>'`, so a traceback that shows local variables (`pytest -l`, `traceback.TracebackException(capture_locals=True)`, error reporters that collect frame variables) shows `'<api key>'` in the client's own frames. Two places still show the key itself:
 

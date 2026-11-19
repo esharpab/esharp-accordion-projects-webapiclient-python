@@ -17,7 +17,7 @@ except AccordionQ2ApiError as e:
 
 | HTTP Status | Meaning | Typical Cause |
 |-------------|---------|---------------|
-| 3xx | Redirect | The station's API never redirects, and the client doesn't follow one: usually a wrong base URL |
+| 3xx | Redirect | The client doesn't follow one. A 308 whose message names an https URL: the station is in security mode `On` and accepts only HTTPS; use that URL. Any other 3xx: usually a wrong base URL |
 | 400 | Bad Request | Invalid parameters, or `get_samples()` called after `reduced_set=True` |
 | 401 | Unauthorized | The station is in security mode `On` and the client sent no API key, or one it doesn't know: `AccordionQ2SecurityError` |
 | 403 | Forbidden | The API key's role is too low (`AccordionQ2SecurityError`); or a change in a read-only folder ([Files](api/files.md)), a plain `AccordionQ2ApiError` |

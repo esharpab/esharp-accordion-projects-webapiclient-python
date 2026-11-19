@@ -9,6 +9,9 @@
 #   server.pem       signed by ca.pem, for TLS servers (extendedKeyUsage serverAuth)
 #   client-eku.pem   signed by ca.pem, but only for TLS clients (extendedKeyUsage clientAuth)
 #   expired.pem      self-signed, valid only 2020-01-01..2021-01-01 (a pin ignores the dates)
+#   chain-root.pem   a second test CA, the root above an intermediate CA
+#   chained-server.pem  signed by that intermediate (serverAuth), followed by the intermediate itself
+#   chained-leaf-only.pem  the same certificate without the intermediate
 # Each *.pem has its key in *-key.pem. All name localhost, 127.0.0.1 and ::1.
 set -e
 DAYS=36500
@@ -50,3 +53,27 @@ printf '%s\n' '[ca]' 'default_ca=x' '[x]' 'dir=ca.tmp' 'database=ca.tmp/index.tx
 openssl ca -batch -config ca.tmp/ca.cnf -selfsign -keyfile expired-key.pem -in expired.csr \
   -startdate 20200101000000Z -enddate 20210101000000Z -extensions ext -notext -out expired.pem
 rm -r expired.csr ca.tmp
+
+# chained-server.pem: a leaf issued by an intermediate CA under its own root (chain-root.pem), followed by
+# that intermediate, as a station with a site certificate sends its chain. chained-leaf-only.pem is the
+# same leaf without the intermediate. Independent of ca.pem.
+key chain-root-key.pem
+openssl req -x509 -new -key chain-root-key.pem -out chain-root.pem -days $DAYS \
+  -subj "/CN=accordionq2 test chain root" -addext "basicConstraints=critical,CA:TRUE" \
+  -addext "keyUsage=critical,keyCertSign,cRLSign" -addext "subjectKeyIdentifier=hash"
+key chain-intermediate-key.pem
+openssl req -new -key chain-intermediate-key.pem -subj "/CN=accordionq2 test issuing CA" -out chain-intermediate.csr
+printf 'basicConstraints=critical,CA:TRUE,pathlen:0\nkeyUsage=critical,keyCertSign,cRLSign\nauthorityKeyIdentifier=keyid\nsubjectKeyIdentifier=hash\n' \
+  > chain-intermediate.ext
+openssl x509 -req -in chain-intermediate.csr -CA chain-root.pem -CAkey chain-root-key.pem -set_serial 2001 \
+  -days $DAYS -extfile chain-intermediate.ext -out chain-intermediate.pem
+key chained-server-key.pem
+openssl req -new -key chained-server-key.pem -subj "/CN=localhost" -out chained-server.csr
+printf '%s\nbasicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=serverAuth\nauthorityKeyIdentifier=keyid\nsubjectKeyIdentifier=hash\n' \
+  "$SAN" > chained-server.ext
+openssl x509 -req -in chained-server.csr -CA chain-intermediate.pem -CAkey chain-intermediate-key.pem \
+  -set_serial 1004 -days $DAYS -extfile chained-server.ext -out chained-leaf-only.pem
+cp chained-server-key.pem chained-leaf-only-key.pem
+cat chained-leaf-only.pem chain-intermediate.pem > chained-server.pem
+rm chain-root-key.pem chain-intermediate-key.pem chain-intermediate.pem chain-intermediate.csr \
+  chain-intermediate.ext chained-server.csr chained-server.ext  # nothing else is signed with them
