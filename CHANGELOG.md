@@ -43,6 +43,18 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
   `ValueError` before sending (the station refuses them there anyway, but only after they crossed the network).
 - A 401 from a login call is no longer reported as an API-key problem; the text for a client without a key also
   mentions logging in.
+
+### Security
+
+- Plain HTTP counts as "the station itself" (where a password may be sent) only for `localhost` or a literal loopback
+  address, `::ffff:127.x.x.x` included; before, any host name starting with `127.` did, `127.example.com` too.
+- `renew()`, `logout()` and `change_password()` go without `X-Api-Key`: with a key as well, the station went by the key,
+  so `logout()` answered 204 but the login stayed valid, and `renew()` answered 400.
+- `logout()` treats a 401 (a token that expired or was logged out) as logged out instead of raising: in mode `On` the
+  station refuses an expired token before the logout runs.
+- Passwords, the setup code and a private key passed to `client.security` are held as a `str` whose `repr()` is
+  `'<secret>'`, and the JSON body carrying them as bytes whose `repr()` hides them, so a traceback with locals doesn't
+  show them in the client's frames.
 - `HttpSession.request` returns an `HttpResponse`: still a `(status, body)` tuple, with `headers`.
 
 ### Compatibility

@@ -26,8 +26,8 @@ from enum import StrEnum
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from ._base import ApiGroupBase
-from .exceptions import AccordionQ2ApiError
+from ._base import API_KEY_HEADER, ApiGroupBase, _hide
+from .exceptions import AccordionQ2ApiError, AccordionQ2SecurityError
 
 
 class SecurityMode(StrEnum):
@@ -723,6 +723,12 @@ def _q(value: str) -> str:
     return quote(value, safe="")
 
 
+# The headers of a call that must go by the login token: no X-Api-Key, because the station goes
+# by the key when both are sent, and would then not renew, log out or change the login's password
+# (CLI-05 follow-up). A None value drops the header (HttpSession.request_headers).
+_TOKEN_ONLY: dict[str, str] = {API_KEY_HEADER: None}  # type: ignore[dict-item]
+
+
 class SecurityGroup(ApiGroupBase):
     """The station's security: logins, users, keys, the certificate, the event log, the
     firewall and SSH, extensions and the factory reset (firmware 7.1.0).
@@ -783,6 +789,8 @@ class SecurityGroup(ApiGroupBase):
         clients need the new fingerprint (:attr:`CertificateInfo.sha256`). Over HTTPS or on
         the station only: the body carries the private key.
         """
+        # Hidden from a traceback's local variables, like the API key (CLI-05 follow-up)
+        private_key_pem, password = _hide(private_key_pem), _hide(password)
         self._session.require_https_or_loopback("Installing a certificate")
         body: dict[str, Any] = {}
         if certificate_pem is not None:
@@ -790,7 +798,7 @@ class SecurityGroup(ApiGroupBase):
         if private_key_pem is not None:
             body["privateKeyPem"] = private_key_pem
         if pfx is not None:
-            body["pfxBase64"] = base64.b64encode(pfx).decode("ascii")
+            body["pfxBase64"] = _hide(base64.b64encode(pfx).decode("ascii"))
         if password is not None:
             body["password"] = password
         return CertificateInfo.from_dict(
@@ -832,8 +840,10 @@ class SecurityGroup(ApiGroupBase):
         Over HTTPS or on the station only (``ValueError`` before sending otherwise). A wrong
         name or password raises :class:`AccordionQ2SecurityError` (401, reason
         ``LOGIN_REFUSED``); too many raise :class:`AccordionQ2ThrottledError` (429). If this
-        client also has an API key, the station goes by the key.
+        client also has an API key, the station goes by the key for every call but
+        :meth:`renew`, :meth:`logout` and :meth:`change_password`, which send only the token.
         """
+        password = _hide(password)
         self._session.require_https_or_loopback("Logging in")
         result = self._login("POST", "api/security/login", {"name": name, "password": password})
         if use:
@@ -847,19 +857,28 @@ class SecurityGroup(ApiGroupBase):
         """
         if not self._session.has_bearer_token:
             raise RuntimeError("This client has no login token to renew; log in first")
-        result = self._login("POST", "api/security/token/renew", None)
+        result = self._login("POST", "api/security/token/renew", None, token_only=True)
         self._session.set_bearer_token(result.token)
         return result
 
     def logout(self) -> None:
         """Log out: this token, and every token renewed from the same login, stops working.
 
-        The client stops sending the token even when the station can't be reached.
+        The client stops sending the token even when the station can't be reached. A token
+        the station no longer accepts (expired, already logged out) is logged out already:
+        no error then, so a ``finally: logout()`` after a long idle doesn't hide the script's
+        own exception. The call goes without the API key, so the station ends the login even
+        when this client has a key too.
         """
         if not self._session.has_bearer_token:
             return
         try:
-            self._post("api/security/logout")
+            self._request("POST", "api/security/logout", headers=dict(_TOKEN_ONLY))
+        except AccordionQ2SecurityError as e:
+            # In On an expired token is refused (401) before the logout runs; in Off and
+            # Report the same call answers 204. Either way the login is over.
+            if e.status_code != 401:
+                raise
         finally:
             self._session.set_bearer_token(None)
 
@@ -876,6 +895,7 @@ class SecurityGroup(ApiGroupBase):
         From the station's own network segment, over HTTPS or on the station. The new admin is
         logged in; with *use* this client sends the token.
         """
+        setup_code, password = _hide(setup_code), _hide(password)
         self._session.require_https_or_loopback("Claiming a station")
         body: dict[str, Any] = {"setupCode": setup_code, "password": password}
         if name is not None:
@@ -888,12 +908,15 @@ class SecurityGroup(ApiGroupBase):
     def change_password(self, current_password: str, new_password: str) -> LoginResponse:
         """Change this login's own password (12 to 128 characters). The user's other logins
         end; the answer is a new token for this one, which this client sends from now on.
+        It goes without the API key, which the station would go by instead of the login.
         """
+        current_password, new_password = _hide(current_password), _hide(new_password)
         self._session.require_https_or_loopback("Changing a password")
         result = self._login(
             "PUT",
             "api/security/password",
             {"currentPassword": current_password, "newPassword": new_password},
+            token_only=True,
         )
         self._session.set_bearer_token(result.token)
         return result
@@ -908,12 +931,14 @@ class SecurityGroup(ApiGroupBase):
         """Make a user (over HTTPS or on the station). 409 for a first admin of an unclaimed
         station, which only the claim, an admin key in ``On`` or the SSH tool makes.
         """
+        password = _hide(password)
         self._session.require_https_or_loopback("Making a user")
         body = {"name": name, "role": str(role), "password": password}
         return UserInfo.from_dict(self._obj(self._post_json("api/security/users", body)))
 
     def set_user_password(self, user_id: str, password: str) -> None:
         """Set a user's password (over HTTPS or on the station): their logins end everywhere."""
+        password = _hide(password)
         self._session.require_https_or_loopback("Setting a password")
         self._request(
             "PUT", f"api/security/users/{_q(user_id)}/password", body={"password": password}
@@ -1050,9 +1075,12 @@ class SecurityGroup(ApiGroupBase):
 
     # ----- helpers -----
 
-    def _login(self, method: str, path: str, body: object) -> LoginResponse:
+    def _login(
+        self, method: str, path: str, body: object, *, token_only: bool = False
+    ) -> LoginResponse:
+        headers = dict(_TOKEN_ONLY) if token_only else None
         return LoginResponse.from_dict(
-            self._obj(json.loads(self._request(method, path, body=body)))
+            self._obj(json.loads(self._request(method, path, body=body, headers=headers)))
         )
 
     @staticmethod

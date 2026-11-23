@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import http.client
+import ipaddress
 import json
 import ssl
 import threading
@@ -33,7 +34,7 @@ import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import BinaryIO
+from typing import BinaryIO, TypeVar, cast
 from urllib.parse import urlparse
 
 from .certificates import normalize_sha256
@@ -163,9 +164,21 @@ def parse_retry_after(value: str | None, now: datetime | None = None) -> float |
 
 
 def _is_loopback_host(host: str) -> bool:
-    """Whether *host* is this computer (``localhost``, 127.0.0.0/8, ``::1``)."""
-    name = host.partition("%")[0].lower()
-    return name == "localhost" or name.startswith("127.") or name in ("::1", "0:0:0:0:0:0:0:1")
+    """Whether *host* is this computer (``localhost``, 127.0.0.0/8, ``::1``, ``::ffff:127.x``).
+
+    Only ``localhost`` itself or a literal loopback address counts: a DNS name such as
+    ``127.example.com`` resolves to wherever its owner likes, and a password must not go
+    there over plain HTTP (FW7_PLAN CLI-05 follow-up).
+    """
+    name = host.strip("[]").partition("%")[0].lower()
+    if name == "localhost":
+        return True
+    try:
+        address = ipaddress.ip_address(name)
+    except ValueError:
+        return False
+    mapped = getattr(address, "ipv4_mapped", None)
+    return address.is_loopback or (mapped is not None and mapped.is_loopback)
 
 
 class _Secret(str):
@@ -180,6 +193,34 @@ class _Secret(str):
 
     def __repr__(self) -> str:
         return "'<api key>'"
+
+
+_T = TypeVar("_T")
+
+
+class _Hidden(_Secret):
+    """A password, setup code or private key as the client holds it: ``repr()`` shows
+    ``'<secret>'``, so a traceback with local variables doesn't show it in the client's frames."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "'<secret>'"
+
+
+def _hide(value: _T) -> _T:
+    """*value* as a :class:`_Hidden` when it is a str not already hidden; else unchanged."""
+    if isinstance(value, str) and not isinstance(value, _Secret):
+        return cast(_T, _Hidden(value))
+    return value
+
+
+class _SecretBody(bytes):
+    """A request body that carries a secret: ``repr()`` doesn't show it (the frames of
+    :meth:`HttpSession.request` and ``_send`` hold it when a send fails)."""
+
+    def __repr__(self) -> str:
+        return "b'<request body with a secret>'"
 
 
 def _secret(api_key: str | None) -> str | None:
@@ -471,7 +512,8 @@ class HttpSession:
         """The headers for one request: the default ones, the API key, then *extra*.
 
         The ``api_key`` replaces an ``X-Api-Key`` of any case among the default
-        headers, also one set later with :meth:`set_default_header`.
+        headers, also one set later with :meth:`set_default_header`. A None value in
+        *extra* leaves that header (any case) out.
         """
         headers = dict(self._default_headers)
         if self._api_key is not None:
@@ -483,8 +525,14 @@ class HttpSession:
             for name in [n for n in headers if n.lower() == "authorization"]:
                 del headers[name]
             headers["Authorization"] = _SecretToken(f"Bearer {bearer}")
-        if extra:
-            headers.update(extra)
+        for name, value in (extra or {}).items():
+            if value is None:
+                # None drops the header in any case: a token-only call sends no X-Api-Key, so
+                # the station goes by the token (CLI-05 follow-up)
+                for other in [n for n in headers if n.lower() == name.lower()]:
+                    del headers[other]
+            else:
+                headers[name] = value
         return headers
 
     def error_for(
@@ -493,8 +541,12 @@ class HttpSession:
         body: bytes,
         fallback: str | None = None,
         headers: object = None,
+        api_key_sent: bool = True,
     ) -> AccordionQ2ApiError:
         """The exception for a refused request with *status*, *body* and *headers*.
+
+        *api_key_sent* False: the request went without the API key (a token-only call), so a
+        401 is about the login token.
 
         :class:`AccordionQ2SecurityError` for 401, and for a 403 that names the
         role it needs, with the server's error after the client's own text;
@@ -536,7 +588,7 @@ class HttpSession:
                 return AccordionQ2SecurityError(
                     status, AccordionQ2SecurityReason.LOGIN_REFUSED, None, server_message
                 )
-            if self._api_key is not None:
+            if self._api_key is not None and api_key_sent:
                 reason = AccordionQ2SecurityReason.INVALID_API_KEY
                 message = (
                     "The station doesn't accept this client's API key (X-Api-Key): it is "
@@ -800,10 +852,19 @@ class ApiGroupBase:
             encoded = body  # type: ignore[assignment]
         else:
             encoded = json.dumps(body).encode("utf-8")
+            if isinstance(body, dict) and any(isinstance(v, _Secret) for v in body.values()):
+                # A password or private key: the body's bytes don't show it in a traceback either
+                encoded = _SecretBody(encoded)
             headers = {**headers, "Content-Type": "application/json"}
         response = self._session.request(method, path, body=encoded, headers=headers)
         status, data = response
         if not 200 <= status < 300:
             # A mocked session may return a plain (status, body) tuple: no headers then
-            raise self._session.error_for(status, data, headers=getattr(response, "headers", None))
+            raise self._session.error_for(
+                status,
+                data,
+                headers=getattr(response, "headers", None),
+                # A token-only call (SecurityGroup._TOKEN_ONLY) sent no key
+                api_key_sent=not (API_KEY_HEADER in headers and headers[API_KEY_HEADER] is None),
+            )
         return data

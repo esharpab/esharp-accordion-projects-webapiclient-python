@@ -8,6 +8,7 @@ SecurityHostController, ExtensionsController, FactoryResetController) and how th
 from __future__ import annotations
 
 import json
+import os
 import traceback
 from typing import Any, ClassVar
 from unittest.mock import MagicMock
@@ -23,6 +24,7 @@ from accordionq2 import (
     SecurityMode,
     StationRole,
 )
+from accordionq2 import security as security_module
 from accordionq2._base import HttpSession
 from accordionq2.security import SecurityGroup
 
@@ -113,7 +115,16 @@ class TestLogin:
         assert headers["Authorization"] == f"Bearer {TOKEN}"
 
     @pytest.mark.parametrize(
-        "url", ["http://station:5000", "http://10.0.0.5:5000", "http://[fe80::1%25eth0]:5000"]
+        "url",
+        [
+            "http://station:5000",
+            "http://10.0.0.5:5000",
+            "http://[fe80::1%25eth0]:5000",
+            # A DNS name that looks like a loopback address resolves wherever its owner likes
+            "http://127.example.com:5000",
+            "http://127.0.0.1.example.com:5000",
+            "http://localhost.example.com:5000",
+        ],
     )
     def test_no_password_over_plain_http_to_another_host(self, url):
         station = Station(url=url)
@@ -131,7 +142,14 @@ class TestLogin:
         assert station.calls == 0
 
     @pytest.mark.parametrize(
-        "url", ["http://localhost:5000", "http://127.0.0.1:5000", "http://[::1]:5000"]
+        "url",
+        [
+            "http://localhost:5000",
+            "http://127.0.0.1:5000",
+            "http://127.1.2.3:5000",
+            "http://[::1]:5000",
+            "http://[::ffff:127.0.0.1]:5000",
+        ],
     )
     def test_a_password_on_the_station_itself_is_sent(self, url):
         station = Station((200, _login()), url=url)
@@ -184,6 +202,53 @@ class TestLogin:
         with pytest.raises(OSError):
             station.security.logout()
         assert not station.session.has_bearer_token
+
+    def test_logout_of_an_expired_token_is_no_error(self):
+        # In On the station refuses an expired token (401, the role the endpoint needs) before
+        # the logout runs; the login is over all the same.
+        station = Station(
+            (
+                401,
+                {
+                    "error": "This station needs an API key in X-Api-Key or a login (a login "
+                    "token that expired or isn't valid was sent)",
+                    "requires": "Viewer",
+                },
+            ),
+            bearer_token=TOKEN,
+        )
+        station.security.logout()
+        assert station.calls == 1
+        assert not station.session.has_bearer_token
+
+    def test_logout_still_raises_other_refusals(self):
+        station = Station((500, {"error": "boom"}), bearer_token=TOKEN)
+        with pytest.raises(AccordionQ2ApiError):
+            station.security.logout()
+        assert not station.session.has_bearer_token
+
+    @pytest.mark.parametrize("call", ["logout", "renew", "change_password"])
+    def test_token_calls_go_without_the_api_key(self, call):
+        # The station goes by X-Api-Key before the token, and would then not end, renew or
+        # change the password of the login.
+        station = Station((200, _login(TOKEN2)), api_key=KEY, bearer_token=TOKEN)
+        if call == "change_password":
+            station.security.change_password(PASSWORD, PASSWORD + "!")
+        else:
+            getattr(station.security, call)()
+        _, _, _, headers = station.sent()
+        assert not [n for n in headers if n.lower() == "x-api-key"]
+        assert headers["Authorization"] == f"Bearer {TOKEN}"
+        # Every other call still sends the key
+        assert station.session.request_headers()["X-Api-Key"] == KEY
+
+    def test_a_refused_token_only_call_names_the_token_not_the_key(self):
+        station = Station(
+            (401, {"error": "x", "requires": "Viewer"}), api_key=KEY, bearer_token=TOKEN
+        )
+        with pytest.raises(AccordionQ2SecurityError) as info:
+            station.security.change_password(PASSWORD, PASSWORD + "!")
+        assert info.value.reason is AccordionQ2SecurityReason.INVALID_TOKEN
 
     def test_logout_without_a_login_sends_nothing(self):
         station = Station()
@@ -311,6 +376,36 @@ class TestBearerToken:
         )
         assert TOKEN not in text
         assert "<login token>" in text
+
+    def test_a_traceback_with_locals_shows_no_password(self):
+        session = HttpSession("https://s:5001", 1.0)
+        conn = MagicMock()
+        conn.request.side_effect = ConnectionRefusedError("refused")
+        session._open = MagicMock(return_value=conn)  # type: ignore[method-assign]
+        security = SecurityGroup(session)
+        pem = "-----BEGIN PRIVATE KEY-----SentinelKeyMaterial-----END PRIVATE KEY-----"
+        for call in (
+            lambda: security.login("anna", PASSWORD),
+            lambda: security.claim("SetupSentinel", PASSWORD),
+            lambda: security.create_user("bo", "Viewer", PASSWORD),
+            lambda: security.set_user_password("9f8e7d6c", PASSWORD),
+            lambda: security.install_certificate("cert", pem, password=PASSWORD),
+        ):
+            with pytest.raises(OSError) as info:
+                call()
+            frames = traceback.TracebackException.from_exception(info.value, capture_locals=True)
+            # The client's own frames; http.client's beneath them hold the request bytes (as
+            # for the key, docs/security.md)
+            package = os.path.dirname(os.path.abspath(security_module.__file__))
+            text = "".join(
+                f"{f.name} {f.locals}"
+                for f in frames.stack
+                if os.path.dirname(os.path.abspath(f.filename)) == package
+            )
+            assert PASSWORD not in text
+            assert "SetupSentinel" not in text and "SentinelKeyMaterial" not in text
+            assert "<secret>" in text
+            assert "<request body with a secret>" in text  # HttpSession.request's frame
 
     def test_set_and_cleared(self):
         session = HttpSession("https://s:5001", 1.0)
