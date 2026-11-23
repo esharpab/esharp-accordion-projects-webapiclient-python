@@ -64,6 +64,18 @@ class CapabilitiesDto:
     #: its answer is not cached, and a busy target answers 409. The Drummer operations need it
     #: (``client.drummer``); older firmware runs transactions for Admin only, under the engine lock.
     RESOURCES_TRANSACT: ClassVar[str] = "resources.transact"
+    #: Feature (firmware 7.1.0): people's logins (``client.security.login()``), the claim, users.
+    SECURITY_LOGIN: ClassVar[str] = "security.login"
+    #: Feature: failed credentials slow a client down (429 with ``Retry-After``).
+    SECURITY_THROTTLE: ClassVar[str] = "security.throttle"
+    #: Feature: the security event log (``client.security.get_events()``).
+    SECURITY_EVENTS: ClassVar[str] = "security.events"
+    #: Feature: the firewall, SSH and SSH keys (``client.security.get_host()``).
+    SECURITY_HOST: ClassVar[str] = "security.host"
+    #: Feature: extension checks and acceptance (``client.security.get_extensions()``).
+    SECURITY_EXTENSIONS: ClassVar[str] = "security.extensions"
+    #: Feature: the factory reset (``client.security.factory_reset()``).
+    SECURITY_FACTORY_RESET: ClassVar[str] = "security.factoryreset"
 
     #: The contract version; 0 for a WebApi that predates it.
     api_version: int = 0

@@ -6,6 +6,51 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [7.5.0] – unreleased
+
+Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
+
+### Added
+
+- **`client.security`** (`SecurityGroup`), every call of `/api/security`: logins (`login`, `renew`, `logout`, `me`,
+  `claim`, `change_password`, `use_token`, `has_token`), users (`get_users`, `create_user`, `set_user_password`,
+  `set_user_role`, `remove_user`), the mode, API keys and the certificate (`get_state`, `set_mode`, `create_key`,
+  `revoke_key`, `get_certificate`, `install_certificate`, `remove_certificate`, `regenerate_certificate`), the
+  security event log (`get_events`), the firewall, SSH and SSH keys (`get_host`, `set_host`, `get_ssh_keys`,
+  `add_ssh_key`, `remove_ssh_key`), extensions (`get_extensions`, `accept_extension`, `withdraw_extension`,
+  `set_extension_uploads`, `set_module_image_role`) and the factory reset (`factory_reset_preview`, `factory_reset`,
+  `last_factory_reset`), with their models (`LoginResponse`, `UserInfo`, `MeInfo`, `SecurityState`, `CertificateInfo`,
+  `SecurityEvents`, `HostSecurity`, `HostSettings`, `SshKey`, `ExtensionsReport`, `FactoryResetPreview`, ...) and
+  `SecurityMode`, `StationRole`. docs/api/security.md.
+- **Bearer tokens**: `bearer_token=` on `AccordionQ2Client`; `login`, `claim`, `renew` and `change_password` set the
+  client's token, `logout` clears it. The token is protected like the API key (`repr()` shows `bearer_token=set`, a
+  traceback with locals `'<login token>'`, server text repeating it withheld) and replaces an `Authorization` from
+  `auth=`.
+- **`AccordionQ2ThrottledError`** (429), a subclass of `AccordionQ2ApiError`, with `retry_after` (seconds, from
+  `Retry-After` as seconds or an HTTP date) and `station_message`; the event stream raises it too.
+  `AccordionQ2ApiError.retry_after` for any answer with `Retry-After` (a busy 503).
+- **`max_throttle_wait=`** on `AccordionQ2Client` (default 0, off): a 429 whose `Retry-After` is at most that many
+  seconds is waited out (outside the session's lock) and the request resent, at most three times, never for an upload
+  from a stream that can't seek. `events.open()` waits the same way.
+- `AccordionQ2SecurityReason.INVALID_TOKEN` (401 for an expired, logged-out or unknown token, no key sent) and
+  `LOGIN_REFUSED` (401 from a login call itself, `requires` `Anonymous`: a wrong password, a login past renewal).
+- `CapabilitiesDto.SECURITY_LOGIN`, `SECURITY_THROTTLE`, `SECURITY_EVENTS`, `SECURITY_HOST`, `SECURITY_EXTENSIONS`,
+  `SECURITY_FACTORY_RESET`.
+
+### Changed
+
+- A password or a certificate's private key is never sent over `http://` to another host: those calls raise
+  `ValueError` before sending (the station refuses them there anyway, but only after they crossed the network).
+- A 401 from a login call is no longer reported as an API-key problem; the text for a client without a key also
+  mentions logging in.
+- `HttpSession.request` returns an `HttpResponse`: still a `(status, body)` tuple, with `headers`.
+
+### Compatibility
+
+- Compatible with 7.4.0. Against firmware before 7.1.0 the security calls answer 404 (401 or 403 in mode `On`).
+
+---
+
 ## [7.4.0] – 2026-11-08
 
 ### Added

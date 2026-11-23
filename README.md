@@ -74,7 +74,7 @@ client.close()
 
 ```python
 AccordionQ2Client(base_url, timeout=30.0, auth=None, verify=True, default_headers=None,
-                  *, api_key=None, cert_sha256=None)
+                  *, api_key=None, cert_sha256=None, bearer_token=None, max_throttle_wait=0.0)
 ```
 
 | Parameter         | Type                    | Default | Description |
@@ -86,6 +86,8 @@ AccordionQ2Client(base_url, timeout=30.0, auth=None, verify=True, default_header
 | `default_headers` | `dict[str, str] \| None` | `None`  | Additional headers merged into every request; an `X-Api-Key` here is handled as `api_key` |
 | `api_key`         | `str \| None`           | `None`  | The station API key (`acc_...`), sent as `X-Api-Key` on every request, the event stream included (7.0) |
 | `cert_sha256`     | `str \| None`           | `None`  | The SHA-256 fingerprint of the station's HTTPS certificate: exactly that certificate is accepted, and any other is refused before anything is sent (7.0) |
+| `bearer_token`    | `str \| None`           | `None`  | A login token to send as `Authorization: Bearer`; usually left `None`, as `client.security.login()` sets it (7.5.0, firmware 7.1.0) |
+| `max_throttle_wait` | `float`               | `0.0`   | Seconds of a 429's `Retry-After` the client waits out by itself before resending, at most three times; 0 raises `AccordionQ2ThrottledError` at once (7.5.0) |
 
 ```python
 import os
@@ -520,6 +522,35 @@ client.firmware.install_package("C:/releases/rel-6.0.0.zip")
 
 ---
 
+### `client.security` &mdash; Logins, Users, Keys and the Station's Security
+
+Firmware 7.1.0's `/api/security` (library 7.5.0): people log in with a user name
+and password and the client sends the token as `Authorization: Bearer`; the rest
+is Admin. Calls that carry a password or a private key are refused before sending
+over `http://` to another host.
+
+| Area | Methods |
+|------|---------|
+| Logins | `login(name, password)`, `renew()`, `logout()`, `me()`, `claim(setup_code, password, name=None)`, `change_password(current, new)`, `use_token(token)`, `has_token` |
+| Users | `get_users()`, `create_user(name, role, password)`, `set_user_password(id, password)`, `set_user_role(id, role)`, `remove_user(id)` |
+| Mode, keys, certificate | `get_state()`, `set_mode(mode)`, `create_key(name, role)`, `revoke_key(id)`, `get_certificate()`, `install_certificate(...)`, `remove_certificate()`, `regenerate_certificate(extra_names=None)` |
+| Security event log | `get_events(tail=200, since=None, kinds=None)` |
+| Firewall and SSH | `get_host()`, `set_host(HostSettings(...))`, `get_ssh_keys()`, `add_ssh_key(line)`, `remove_ssh_key(id)` |
+| Extensions | `get_extensions()`, `accept_extension(folder, digest)`, `withdraw_extension(folder)`, `set_extension_uploads(minutes)`, `set_module_image_role(role)` |
+| Factory reset | `factory_reset_preview()`, `factory_reset(confirm, erase_calibration=False)`, `last_factory_reset()` |
+
+```python
+import getpass
+
+with AccordionQ2Client("https://station-12:5001", cert_sha256="3F:A2:7C:...:9C") as client:
+    login = client.security.login("anna", getpass.getpass())
+    for event in client.security.get_events(tail=10).events:
+        print(event.time, event.kind, event.client)
+    client.security.logout()
+```
+
+---
+
 ## Models
 
 All models live in `accordionq2.models`.
@@ -596,8 +627,11 @@ except AccordionQ2ApiError as e:
 ```
 
 A refusal for want of an API key (401) or a role (403) is its subclass
-`AccordionQ2SecurityError`, with `reason` (`MISSING_API_KEY`, `INVALID_API_KEY`
-or `ROLE_TOO_LOW`) and `required_role`.  Over HTTPS, a certificate that isn't
+`AccordionQ2SecurityError`, with `reason` (`MISSING_API_KEY`, `INVALID_API_KEY`,
+`INVALID_TOKEN`, `LOGIN_REFUSED` or `ROLE_TOO_LOW`) and `required_role`.  A 429
+(security mode `On` slowing the client down) is `AccordionQ2ThrottledError` with
+`retry_after` in seconds; with `max_throttle_wait=` the client waits it out and
+resends by itself.  Over HTTPS, a certificate that isn't
 the pinned one raises `AccordionQ2CertificateError` (an
 `ssl.SSLCertVerificationError`) before anything is sent.
 

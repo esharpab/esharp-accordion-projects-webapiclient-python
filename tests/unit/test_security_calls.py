@@ -1,0 +1,816 @@
+"""Unit tests for client.security (firmware 7.1.0; FW7_PLAN CLI-05 follow-up).
+
+The connection is mocked; each test checks the method, path and body sent against the WebApi's
+security controllers (AccountsController, SecurityController, SecurityEventsController,
+SecurityHostController, ExtensionsController, FactoryResetController) and how the answer is read.
+"""
+
+from __future__ import annotations
+
+import json
+import traceback
+from typing import Any, ClassVar
+from unittest.mock import MagicMock
+
+import pytest
+
+from accordionq2 import (
+    AccordionQ2ApiError,
+    AccordionQ2Client,
+    AccordionQ2SecurityError,
+    AccordionQ2SecurityReason,
+    HostSettings,
+    SecurityMode,
+    StationRole,
+)
+from accordionq2._base import HttpSession
+from accordionq2.security import SecurityGroup
+
+KEY = "acc_Sentinel0123456789abcdefKEY"
+TOKEN = "v1.k1.eyJzIjoiU2Vzc2lvbiJ9.c2lnbmF0dXJlU2VudGluZWw"
+TOKEN2 = "v1.k1.eyJzIjoiUmVuZXdlZCJ9.c2lnbmF0dXJlU2VudGluZWwy"
+PASSWORD = "correct horse battery staple"
+USER = {
+    "id": "9f8e7d6c",
+    "name": "anna",
+    "role": "Operator",
+    "created": "2026-11-20T10:00:00+00:00",
+    "createdBy": "user:1a2b3c4d:admin",
+}
+
+
+def _login(token: str = TOKEN) -> dict[str, object]:
+    return {
+        "token": token,
+        "expiresAt": "2026-11-23T12:15:00+00:00",
+        "user": USER,
+        "expiresIn": 900,
+    }
+
+
+def _response(status: int, body: object, headers: dict[str, str] | None = None) -> MagicMock:
+    resp = MagicMock()
+    resp.status = status
+    resp.read.return_value = body if isinstance(body, bytes) else json.dumps(body).encode()
+    resp.headers = headers or {}
+    return resp
+
+
+class Station:
+    """A security group on a session whose connection answers *answers* in order."""
+
+    def __init__(self, *answers: tuple[int, object], url: str = "https://station:5001", **kw):
+        self.session = HttpSession(url, timeout=5.0, verify=False, **kw)
+        self.session._conn = MagicMock()
+        self.session._conn.getresponse.side_effect = [_response(s, b) for s, b in answers]
+        self.security = SecurityGroup(self.session)
+
+    def sent(self, index: int = -1) -> tuple[str, str, object, dict[str, str]]:
+        call = self.session._conn.request.call_args_list[index]  # type: ignore[union-attr]
+        method, path = call.args
+        body = call.kwargs["body"]
+        return method, path, json.loads(body) if body else None, call.kwargs["headers"]
+
+    @property
+    def calls(self) -> int:
+        return self.session._conn.request.call_count  # type: ignore[union-attr]
+
+
+# ---------------------------------------------------------------------------
+# Logins and the bearer token
+# ---------------------------------------------------------------------------
+
+
+class TestLogin:
+    def test_login_sends_the_name_and_password_and_uses_the_token(self):
+        station = Station((200, _login()), (200, b"[]"))
+        result = station.security.login("anna", PASSWORD)
+        method, path, body, headers = station.sent()
+        assert (method, path) == ("POST", "/api/security/login")
+        assert body == {"name": "anna", "password": PASSWORD}
+        assert "Authorization" not in headers
+        assert result.token == TOKEN
+        assert result.expires_in == 900
+        assert result.user.name == "anna" and result.user.role == "Operator"
+        assert result.user.created_by == "user:1a2b3c4d:admin"
+        assert station.session.has_bearer_token
+        station.security.get_users()
+        assert station.sent()[3]["Authorization"] == f"Bearer {TOKEN}"
+
+    def test_login_without_use_leaves_the_client_as_it_was(self):
+        station = Station((200, _login()))
+        station.security.login("anna", PASSWORD, use=False)
+        assert not station.session.has_bearer_token
+
+    def test_the_token_is_never_in_a_repr(self):
+        station = Station((200, _login()))
+        result = station.security.login("anna", PASSWORD)
+        assert TOKEN not in repr(result)
+        assert TOKEN not in repr(station.session)
+        assert "bearer_token=set" in repr(station.session)
+        headers = station.session.request_headers()
+        assert TOKEN not in repr(headers)
+        assert headers["Authorization"] == f"Bearer {TOKEN}"
+
+    @pytest.mark.parametrize(
+        "url", ["http://station:5000", "http://10.0.0.5:5000", "http://[fe80::1%25eth0]:5000"]
+    )
+    def test_no_password_over_plain_http_to_another_host(self, url):
+        station = Station(url=url)
+        for call in (
+            lambda: station.security.login("anna", PASSWORD),
+            lambda: station.security.claim("123456", PASSWORD),
+            lambda: station.security.change_password(PASSWORD, PASSWORD + "!"),
+            lambda: station.security.create_user("bo", "Viewer", PASSWORD),
+            lambda: station.security.set_user_password("9f8e7d6c", PASSWORD),
+            lambda: station.security.install_certificate("cert", "key"),
+        ):
+            with pytest.raises(ValueError, match="HTTPS") as info:
+                call()
+            assert PASSWORD not in str(info.value)
+        assert station.calls == 0
+
+    @pytest.mark.parametrize(
+        "url", ["http://localhost:5000", "http://127.0.0.1:5000", "http://[::1]:5000"]
+    )
+    def test_a_password_on_the_station_itself_is_sent(self, url):
+        station = Station((200, _login()), url=url)
+        station.security.login("anna", PASSWORD)
+        assert station.calls == 1
+
+    def test_a_wrong_password_is_a_login_refusal_not_a_key_problem(self):
+        station = Station((401, {"error": "Wrong user name or password", "requires": "Anonymous"}))
+        with pytest.raises(AccordionQ2SecurityError) as info:
+            station.security.login("anna", "wrong password!")
+        assert info.value.reason is AccordionQ2SecurityReason.LOGIN_REFUSED
+        assert str(info.value) == "Wrong user name or password"
+        assert not station.session.has_bearer_token
+
+    def test_renew_sends_the_token_and_uses_the_new_one(self):
+        station = Station((200, _login(TOKEN2)), bearer_token=TOKEN)
+        result = station.security.renew()
+        method, path, body, headers = station.sent()
+        assert (method, path, body) == ("POST", "/api/security/token/renew", None)
+        assert headers["Authorization"] == f"Bearer {TOKEN}"
+        assert result.token == TOKEN2
+        assert station.session.request_headers()["Authorization"] == f"Bearer {TOKEN2}"
+
+    def test_renew_without_a_login(self):
+        with pytest.raises(RuntimeError, match="log in first"):
+            Station().security.renew()
+
+    def test_renew_past_twelve_hours(self):
+        refusal = {
+            "error": "This login can't be renewed any more: log in again",
+            "requires": "Anonymous",
+        }
+        station = Station((401, refusal), bearer_token=TOKEN)
+        with pytest.raises(AccordionQ2SecurityError) as info:
+            station.security.renew()
+        assert info.value.reason is AccordionQ2SecurityReason.LOGIN_REFUSED
+
+    def test_logout_sends_it_and_forgets_the_token(self):
+        station = Station((204, b""), bearer_token=TOKEN)
+        station.security.logout()
+        method, path, _, headers = station.sent()
+        assert (method, path) == ("POST", "/api/security/logout")
+        assert headers["Authorization"] == f"Bearer {TOKEN}"
+        assert not station.session.has_bearer_token
+
+    def test_logout_forgets_the_token_when_the_station_cannot_be_reached(self):
+        station = Station(bearer_token=TOKEN)
+        station.session._conn.request.side_effect = ConnectionRefusedError("down")  # type: ignore[union-attr]
+        station.session._open = MagicMock(return_value=station.session._conn)  # type: ignore[method-assign]
+        with pytest.raises(OSError):
+            station.security.logout()
+        assert not station.session.has_bearer_token
+
+    def test_logout_without_a_login_sends_nothing(self):
+        station = Station()
+        station.security.logout()
+        assert station.calls == 0
+
+    def test_me(self):
+        me = {
+            "mode": "On",
+            "claimed": True,
+            "caller": {
+                "kind": "User",
+                "id": "9f8e7d6c",
+                "name": "anna",
+                "role": "Operator",
+                "expiresAt": "2026-11-23T12:15:00+00:00",
+            },
+            "loginAvailable": True,
+        }
+        result = Station((200, me)).security.me()
+        assert result.mode == SecurityMode.ON
+        assert result.claimed and result.login_available
+        assert result.caller is not None
+        assert (result.caller.kind, result.caller.role) == ("User", "Operator")
+        anonymous = Station((200, {"mode": "Off", "claimed": False, "caller": None})).security.me()
+        assert anonymous.caller is None and not anonymous.login_available
+
+    def test_claim(self):
+        station = Station((201, _login()))
+        station.security.claim("482913", PASSWORD, name="root-admin")
+        method, path, body, _ = station.sent()
+        assert (method, path) == ("POST", "/api/security/claim")
+        assert body == {"setupCode": "482913", "password": PASSWORD, "name": "root-admin"}
+        assert station.session.has_bearer_token
+        default = Station((201, _login()))
+        default.security.claim("482913", PASSWORD)
+        assert "name" not in default.sent()[2]  # type: ignore[operator]
+
+    def test_change_password_uses_the_new_token(self):
+        station = Station((200, _login(TOKEN2)), bearer_token=TOKEN)
+        station.security.change_password(PASSWORD, PASSWORD + " 2")
+        method, path, body, _ = station.sent()
+        assert (method, path) == ("PUT", "/api/security/password")
+        assert body == {"currentPassword": PASSWORD, "newPassword": PASSWORD + " 2"}
+        assert station.session.request_headers()["Authorization"] == f"Bearer {TOKEN2}"
+
+    def test_a_wrong_current_password_keeps_the_login(self):
+        station = Station(
+            (401, {"error": "The current password is wrong", "requires": "Anonymous"}),
+            bearer_token=TOKEN,
+        )
+        with pytest.raises(AccordionQ2SecurityError) as info:
+            station.security.change_password("not it at all", PASSWORD)
+        assert info.value.reason is AccordionQ2SecurityReason.LOGIN_REFUSED
+        assert station.session.request_headers()["Authorization"] == f"Bearer {TOKEN}"
+
+
+class TestBearerToken:
+    def test_given_to_the_client(self):
+        client = AccordionQ2Client("https://s:5001", bearer_token=TOKEN)
+        assert client._session.request_headers()["Authorization"] == f"Bearer {TOKEN}"
+        assert TOKEN not in repr(client)
+
+    def test_replaces_basic_auth(self):
+        session = HttpSession("https://s:5001", 1.0, auth=("bob", "pw"), bearer_token=TOKEN)
+        headers = session.request_headers()
+        assert [n for n in headers if n.lower() == "authorization"] == ["Authorization"]
+        assert headers["Authorization"] == f"Bearer {TOKEN}"
+
+    def test_sent_beside_the_api_key(self):
+        session = HttpSession("https://s:5001", 1.0, api_key=KEY, bearer_token=TOKEN)
+        headers = session.request_headers()
+        assert headers["X-Api-Key"] == KEY
+        assert headers["Authorization"] == f"Bearer {TOKEN}"
+
+    @pytest.mark.parametrize("bad", ["", "  ", f"{TOKEN}\r\nX-Evil: 1", f"{TOKEN} x"])
+    def test_a_token_a_header_cannot_carry_is_refused_without_echoing_it(self, bad):
+        with pytest.raises(ValueError) as info:
+            AccordionQ2Client("https://s:5001", bearer_token=bad)
+        assert TOKEN not in str(info.value)
+
+    def test_an_expired_token_is_named(self):
+        station = Station(
+            (
+                401,
+                {
+                    "error": "This station needs an API key in X-Api-Key or a login (a login "
+                    "token that expired or isn't valid was sent)",
+                    "requires": "Viewer",
+                },
+            ),
+            bearer_token=TOKEN,
+        )
+        with pytest.raises(AccordionQ2SecurityError) as info:
+            station.security.get_users()
+        assert info.value.reason is AccordionQ2SecurityReason.INVALID_TOKEN
+        assert "log in again" in str(info.value)
+        assert info.value.required_role == "Viewer"
+
+    def test_with_a_key_too_the_key_is_named(self):
+        # The station identifies a request by its key first.
+        station = Station(
+            (401, {"error": "x", "requires": "Viewer"}), api_key=KEY, bearer_token=TOKEN
+        )
+        with pytest.raises(AccordionQ2SecurityError) as info:
+            station.security.get_users()
+        assert info.value.reason is AccordionQ2SecurityReason.INVALID_API_KEY
+
+    def test_server_text_with_the_token_is_withheld(self):
+        station = Station((500, {"error": f"bad token {TOKEN}"}), bearer_token=TOKEN)
+        with pytest.raises(AccordionQ2ApiError) as info:
+            station.security.get_users()
+        assert TOKEN not in str(info.value)
+        assert "withheld" in str(info.value)
+
+    def test_a_traceback_with_locals_shows_no_token(self):
+        session = HttpSession("https://s:5001", 1.0, bearer_token=TOKEN)
+        conn = MagicMock()
+        conn.request.side_effect = ConnectionRefusedError("refused")
+        session._open = MagicMock(return_value=conn)  # type: ignore[method-assign]
+        with pytest.raises(OSError) as info:
+            SecurityGroup(session).get_users()
+        text = "".join(
+            traceback.TracebackException.from_exception(info.value, capture_locals=True).format()
+        )
+        assert TOKEN not in text
+        assert "<login token>" in text
+
+    def test_set_and_cleared(self):
+        session = HttpSession("https://s:5001", 1.0)
+        session.set_bearer_token(TOKEN)
+        assert session.has_bearer_token
+        session.set_bearer_token(None)
+        assert "Authorization" not in session.request_headers()
+
+
+# ---------------------------------------------------------------------------
+# Users
+# ---------------------------------------------------------------------------
+
+
+class TestUsers:
+    def test_list(self):
+        users = Station((200, [USER])).security.get_users()
+        assert [u.id for u in users] == ["9f8e7d6c"]
+
+    def test_create(self):
+        station = Station((201, USER))
+        user = station.security.create_user("anna", StationRole.OPERATOR, PASSWORD)
+        assert station.sent()[:3] == (
+            "POST",
+            "/api/security/users",
+            {"name": "anna", "role": "Operator", "password": PASSWORD},
+        )
+        assert user.name == "anna"
+
+    def test_set_password(self):
+        station = Station((204, b""))
+        station.security.set_user_password("9f 8e", PASSWORD)
+        assert station.sent()[:3] == (
+            "PUT",
+            "/api/security/users/9f%208e/password",
+            {"password": PASSWORD},
+        )
+
+    def test_set_role(self):
+        station = Station((200, {**USER, "role": "Admin"}))
+        assert station.security.set_user_role("9f8e7d6c", "Admin").role == "Admin"
+        assert station.sent()[:3] == ("PUT", "/api/security/users/9f8e7d6c/role", {"role": "Admin"})
+
+    def test_remove(self):
+        station = Station((204, b""))
+        station.security.remove_user("9f8e7d6c")
+        assert station.sent()[:2] == ("DELETE", "/api/security/users/9f8e7d6c")
+
+    def test_the_first_admin_refusal_is_the_stations_409(self):
+        station = Station((409, {"error": "Claim the station first", "requires": "Admin"}))
+        with pytest.raises(AccordionQ2ApiError) as info:
+            station.security.create_user("root", "Admin", PASSWORD)
+        assert info.value.status_code == 409
+
+
+# ---------------------------------------------------------------------------
+# The mode, keys and certificate
+# ---------------------------------------------------------------------------
+
+
+CERT = {
+    "source": "SelfSigned",
+    "sha256": "3F:A2:7C",
+    "subject": "CN=A004166",
+    "issuer": "CN=A004166",
+    "notBefore": "2026-01-01T00:00:00+00:00",
+    "notAfter": "2036-01-01T00:00:00+00:00",
+    "expired": False,
+    "dnsNames": ["A004166", "A004166.local"],
+    "ipAddresses": ["10.0.0.5"],
+    "chain": ["CN=A004166"],
+    "selfSignedSha256": "3F:A2:7C",
+    "nameMatchesHost": True,
+    "cloned": None,
+    "certificatePem": "-----BEGIN CERTIFICATE-----",
+}
+
+
+class TestModeKeysCertificate:
+    def test_state(self):
+        state = Station(
+            (
+                200,
+                {
+                    "mode": "Report",
+                    "keys": [
+                        {
+                            "id": "1a2b3c4d",
+                            "name": "assert-st01",
+                            "role": "Operator",
+                            "created": "2026-10-01T00:00:00+00:00",
+                            "createdBy": "admin",
+                            "issuedOver": None,
+                        }
+                    ],
+                    "users": [USER],
+                    "claimed": True,
+                    "throttled": [
+                        {
+                            "client": "10.0.0.9",
+                            "purpose": "Key",
+                            "failures": 12,
+                            "until": "2026-11-23T12:00:04+00:00",
+                        }
+                    ],
+                    "extensionUploadsUntil": None,
+                    "moduleImageRole": "Operator",
+                    "extensionCheck": {
+                        "release": "7.1.0",
+                        "problem": None,
+                        "failed": ["x"],
+                        "unsigned": [],
+                    },
+                },
+            )
+        ).security.get_state()
+        assert state.mode == "Report"
+        assert state.keys[0].issued_over is None
+        assert state.users[0].name == "anna"
+        assert state.throttled is not None and state.throttled[0].failures == 12
+        assert state.module_image_role == "Operator"
+        assert state.extension_check is not None and state.extension_check.failed == ("x",)
+        assert state.warnings is None
+
+    def test_state_of_an_older_station(self):
+        state = Station((200, {"mode": "Off", "keys": []})).security.get_state()
+        assert state.throttled is None and state.users == () and state.module_image_role == "Admin"
+
+    def test_set_mode(self):
+        station = Station((200, {"mode": "On", "keys": [], "warnings": ["SSH accepts nobody"]}))
+        state = station.security.set_mode(SecurityMode.ON)
+        assert station.sent()[:3] == ("PUT", "/api/security/mode", {"mode": "On"})
+        assert state.warnings == ("SSH accepts nobody",)
+
+    def test_create_key_never_shows_the_key_in_a_repr(self):
+        station = Station(
+            (
+                201,
+                {
+                    "info": {
+                        "id": "1a2b3c4d",
+                        "name": "line-3",
+                        "role": "Operator",
+                        "created": "2026-11-23T00:00:00+00:00",
+                        "createdBy": "admin",
+                        "issuedOver": "Https",
+                    },
+                    "key": KEY,
+                },
+            )
+        )
+        created = station.security.create_key("line-3", "Operator")
+        assert station.sent()[:3] == (
+            "POST",
+            "/api/security/keys",
+            {"name": "line-3", "role": "Operator"},
+        )
+        assert created.key == KEY and created.info.issued_over == "Https"
+        assert KEY not in repr(created)
+        assert created.warnings is None
+
+    def test_revoke_key(self):
+        station = Station((204, b""))
+        station.security.revoke_key("1a2b3c4d")
+        assert station.sent()[:2] == ("DELETE", "/api/security/keys/1a2b3c4d")
+
+    def test_get_certificate(self):
+        cert = Station((200, CERT)).security.get_certificate()
+        assert cert.sha256 == "3F:A2:7C" and cert.dns_names == ("A004166", "A004166.local")
+        assert cert.cloned is None and cert.open_connections_closed is None
+
+    def test_install_pem(self):
+        station = Station(
+            (200, {**CERT, "source": "Site", "openConnectionsClosed": 2, "warnings": []})
+        )
+        cert = station.security.install_certificate("CERT", "KEY", password="pw")
+        assert station.sent()[:3] == (
+            "PUT",
+            "/api/security/certificate",
+            {"certificatePem": "CERT", "privateKeyPem": "KEY", "password": "pw"},
+        )
+        assert cert.source == "Site" and cert.open_connections_closed == 2
+
+    def test_install_pfx(self):
+        station = Station((200, CERT))
+        station.security.install_certificate(pfx=b"\x30\x82", password="pw")
+        assert station.sent()[2] == {"pfxBase64": "MII=", "password": "pw"}
+
+    def test_remove_and_regenerate(self):
+        station = Station((200, CERT), (200, CERT), (200, CERT))
+        station.security.remove_certificate()
+        assert station.sent()[:2] == ("DELETE", "/api/security/certificate")
+        station.security.regenerate_certificate()
+        assert station.sent()[:3] == ("POST", "/api/security/certificate/regenerate", None)
+        station.security.regenerate_certificate(["station-12.lab", "10.0.0.5"])
+        assert station.sent()[2] == {"extraNames": ["station-12.lab", "10.0.0.5"]}
+
+
+# ---------------------------------------------------------------------------
+# The security event log
+# ---------------------------------------------------------------------------
+
+
+class TestEvents:
+    ANSWER: ClassVar[dict[str, Any]] = {
+        "events": [
+            {
+                "time": "2026-11-23T11:00:00+00:00",
+                "kind": "LoginFailed",
+                "who": "-",
+                "client": "10.0.0.9",
+                "forwardedFor": None,
+                "mode": "On",
+                "endpoint": "POST /api/security/login",
+                "data": {"why": "wrongPassword", "user": "anna"},
+            }
+        ],
+        "maxAgeDays": 365,
+        "maxBytes": 10485760,
+        "oldest": "2026-01-01T00:00:00+00:00",
+    }
+
+    def test_default(self):
+        station = Station((200, self.ANSWER))
+        result = station.security.get_events()
+        assert station.sent()[:2] == ("GET", "/api/security/events?tail=200")
+        assert result.events[0].kind == "LoginFailed"
+        assert result.events[0].data == {"why": "wrongPassword", "user": "anna"}
+        assert result.max_bytes == 10485760
+
+    def test_since_and_kinds(self):
+        from datetime import UTC, datetime, timedelta, timezone
+
+        station = Station((200, self.ANSWER), (200, self.ANSWER))
+        station.security.get_events(
+            tail=50,
+            since=datetime(2026, 11, 23, 12, 0, tzinfo=timezone(timedelta(hours=1))),
+            kinds=["LoginFailed", "Throttled"],
+        )
+        assert station.sent()[1] == (
+            "/api/security/events?tail=50&since=2026-11-23T12%3A00%3A00%2B01%3A00"
+            "&kind=LoginFailed&kind=Throttled"
+        )
+        station.security.get_events(since=datetime(2026, 11, 23, tzinfo=UTC).isoformat())
+        assert "since=2026-11-23T00%3A00%3A00%2B00%3A00" in station.sent()[1]
+
+
+# ---------------------------------------------------------------------------
+# The firewall, SSH and SSH keys
+# ---------------------------------------------------------------------------
+
+
+SSH_KEY = {
+    "id": "k1",
+    "fingerprint": "SHA256:abc",
+    "type": "ssh-ed25519",
+    "bits": 256,
+    "comment": "anna@pc",
+    "hasOptions": False,
+}
+
+
+class TestHost:
+    ANSWER: ClassVar[dict[str, Any]] = {
+        "settings": {
+            "sshAllowed": True,
+            "sshFrom": ["10.0.0.0/24"],
+            "xvcPorts": [2542],
+            "xvcFrom": [],
+        },
+        "firewall": {"state": "Applied", "problem": None, "at": "2026-11-23T11:00:00+00:00"},
+        "ssh": {"state": "Failed", "problem": "sshd -t failed", "at": None},
+        "tcpPorts": [5001, 443],
+        "sshPort": 22,
+        "sshKeys": 0,
+        "warnings": ["SSH accepts nobody until a key is installed"],
+    }
+
+    def test_get(self):
+        host = Station((200, self.ANSWER)).security.get_host()
+        assert host.settings == HostSettings(True, ("10.0.0.0/24",), (2542,), ())
+        assert host.firewall.state == "Applied" and host.ssh.problem == "sshd -t failed"
+        assert host.tcp_ports == (5001, 443) and host.ssh_keys == 0
+        assert host.warnings == ("SSH accepts nobody until a key is installed",)
+
+    def test_set(self):
+        station = Station((200, self.ANSWER))
+        station.security.set_host(
+            HostSettings(ssh_allowed=False, xvc_ports=(2542,), xvc_from=("10.0.0.7",))
+        )
+        assert station.sent()[:3] == (
+            "PUT",
+            "/api/security/host",
+            {
+                "sshAllowed": False,
+                "sshFrom": [],
+                "xvcPorts": [2542],
+                "xvcFrom": ["10.0.0.7"],
+            },
+        )
+
+    def test_ssh_keys(self):
+        station = Station(
+            (200, [SSH_KEY]),
+            (201, {"info": SSH_KEY, "warnings": None}),
+            (200, {"keys": [], "warnings": ["SSH accepts nobody until a key is installed"]}),
+        )
+        assert station.security.get_ssh_keys()[0].fingerprint == "SHA256:abc"
+        added = station.security.add_ssh_key("ssh-ed25519 AAAAC3Nz anna@pc")
+        assert station.sent()[:3] == (
+            "POST",
+            "/api/security/ssh-keys",
+            {"key": "ssh-ed25519 AAAAC3Nz anna@pc"},
+        )
+        assert added.keys[0].id == "k1" and added.warnings is None
+        left = station.security.remove_ssh_key("k1")
+        assert station.sent()[:2] == ("DELETE", "/api/security/ssh-keys/k1")
+        assert left.keys == () and left.warnings == ("SSH accepts nobody until a key is installed",)
+
+
+# ---------------------------------------------------------------------------
+# Extensions and module images
+# ---------------------------------------------------------------------------
+
+
+FOLDER = {
+    "folder": "MicroHAPS",
+    "state": "Unsigned",
+    "digest": "ab12",
+    "files": 3,
+    "changedFiles": [],
+    "missingFiles": [],
+    "extraFiles": [],
+    "links": [],
+    "acceptedBy": None,
+    "acceptedAt": None,
+    "referencedBy": ["MicroHAPS"],
+    "unreadable": [],
+}
+
+
+class TestExtensions:
+    def test_report(self):
+        report = Station(
+            (
+                200,
+                {
+                    "release": {
+                        "version": "7.1.0",
+                        "source": "copy",
+                        "signer": "CN=E-Sharp",
+                        "signedAt": None,
+                        "problem": None,
+                    },
+                    "folders": [FOLDER],
+                    "outside": [
+                        {
+                            "module": "X",
+                            "assemblyPath": "/opt/x.dll",
+                            "source": "boot.config",
+                            "enabled": True,
+                            "folder": None,
+                        }
+                    ],
+                },
+            )
+        ).security.get_extensions()
+        assert report.release.version == "7.1.0"
+        assert report.folders[0].state == "Unsigned" and report.folders[0].referenced_by == (
+            "MicroHAPS",
+        )
+        assert report.outside[0].folder is None and report.outside[0].assembly_path == "/opt/x.dll"
+
+    def test_accept_and_withdraw(self):
+        station = Station(
+            (200, {"folder": {**FOLDER, "state": "Accepted"}, "warnings": ["unsigned code"]}),
+            (204, b""),
+        )
+        folder, warnings = station.security.accept_extension("MicroHAPS", "ab12")
+        assert station.sent()[:3] == (
+            "POST",
+            "/api/security/extensions/accept",
+            {"folder": "MicroHAPS", "digest": "ab12"},
+        )
+        assert folder.state == "Accepted" and warnings == ["unsigned code"]
+        station.security.withdraw_extension("Micro HAPS")
+        assert station.sent()[:2] == (
+            "DELETE",
+            "/api/security/extensions/accept?folder=Micro%20HAPS",
+        )
+
+    def test_a_changed_folder_is_the_stations_409(self):
+        station = Station(
+            (409, {"error": "MicroHAPS changed since it was read", "requires": "Admin"})
+        )
+        with pytest.raises(AccordionQ2ApiError) as info:
+            station.security.accept_extension("MicroHAPS", "old")
+        assert info.value.status_code == 409
+
+    def test_upload_window_and_module_image_role(self):
+        station = Station(
+            (
+                200,
+                {"extensionUploadsUntil": "2026-11-23T13:00:00+00:00", "warnings": ["Until ..."]},
+            ),
+            (200, {"extensionUploadsUntil": None, "warnings": None}),
+            (200, {"moduleImageRole": "Operator", "warnings": ["Operators may load ..."]}),
+        )
+        until, warnings = station.security.set_extension_uploads(60)
+        assert station.sent()[:3] == ("PUT", "/api/security/extension-uploads", {"minutes": 60})
+        assert until == "2026-11-23T13:00:00+00:00" and warnings == ["Until ..."]
+        assert station.security.set_extension_uploads(0) == (None, [])
+        role, _ = station.security.set_module_image_role(StationRole.OPERATOR)
+        assert station.sent()[:3] == ("PUT", "/api/security/module-images", {"role": "Operator"})
+        assert role == "Operator"
+
+
+# ---------------------------------------------------------------------------
+# The factory reset
+# ---------------------------------------------------------------------------
+
+
+class TestFactoryReset:
+    def test_preview(self):
+        preview = Station(
+            (
+                200,
+                {
+                    "hostName": "A004166",
+                    "keys": 2,
+                    "users": 1,
+                    "certificate": True,
+                    "stationSettings": True,
+                    "aliasFiles": 3,
+                    "stateMachines": 0,
+                    "captures": 4,
+                    "calibrationFiles": 5,
+                    "unshippedExtensions": ["X"],
+                    "extensionListPresent": True,
+                    "drummerFiles": 0,
+                    "authorizedKeys": True,
+                    "erased": ["keys"],
+                    "kept": ["firmware"],
+                },
+            )
+        ).security.factory_reset_preview()
+        assert preview.host_name == "A004166" and preview.calibration_files == 5
+        assert preview.unshipped_extensions == ("X",) and preview.kept == ("firmware",)
+
+    def test_start(self):
+        station = Station(
+            (202, {"unit": "accordion-factory-reset", "message": "The station stops"})
+        )
+        started = station.security.factory_reset("A004166", erase_calibration=True)
+        assert station.sent()[:3] == (
+            "POST",
+            "/api/security/factory-reset",
+            {"confirm": "A004166", "eraseCalibration": True},
+        )
+        assert started.unit == "accordion-factory-reset"
+
+    def test_a_wrong_name_is_the_stations_400(self):
+        station = Station((400, {"error": "Type the station's host name", "requires": "Admin"}))
+        with pytest.raises(AccordionQ2ApiError) as info:
+            station.security.factory_reset("wrong")
+        assert info.value.status_code == 400
+
+    def test_last(self):
+        station = Station(
+            (
+                200,
+                {
+                    "time": "2026-11-01T00:00:00+00:00",
+                    "by": "user:1:admin",
+                    "client": "10.0.0.9",
+                    "version": "7.1.0",
+                    "calibrationErased": False,
+                    "erased": ["keys"],
+                    "kept": ["firmware"],
+                    "warnings": [],
+                    "rebooted": True,
+                },
+            ),
+            (404, {"error": "This station has no record of a factory reset", "requires": "Admin"}),
+        )
+        record = station.security.last_factory_reset()
+        assert record is not None and record.rebooted and record.by == "user:1:admin"
+        assert station.security.last_factory_reset() is None
+
+
+def test_on_the_client():
+    assert isinstance(AccordionQ2Client("https://s:5001").security, SecurityGroup)
+
+
+def test_use_token():
+    station = Station((200, [USER]))
+    assert not station.security.has_token
+    station.security.use_token(TOKEN)
+    assert station.security.has_token
+    station.security.get_users()
+    assert station.sent()[3]["Authorization"] == f"Bearer {TOKEN}"
+    station.security.use_token(None)
+    assert not station.security.has_token

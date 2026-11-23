@@ -105,6 +105,26 @@ A zone that starts with `25` followed by more is read as the RFC 6874 form, as i
 
 A base URL that isn't an absolute `http://` or `https://` URL raises a `ValueError`.
 
-## Bearer tokens
+## Logins (Bearer tokens)
 
-Not yet: the station doesn't issue them. An API key is the way to authenticate.
+From firmware 7.1.0 a station has users with passwords, for people; machines keep using API keys. With library 7.5.0, `client.security.login(name, password)` gets a token, valid 15 minutes and renewable for 12 hours after the login, and the client sends it as `Authorization: Bearer` from then on:
+
+```python
+login = client.security.login("anna", getpass.getpass())   # over https:// only
+...
+client.security.renew()     # before login.expires_in runs out
+client.security.logout()
+```
+
+The client refuses to send a password (a login, a claim, a password change or a new user) or a certificate's private key over `http://` to another host, before sending anything: the station would refuse it anyway, but only after it crossed the network in clear text. The token is protected like the key: `repr()` shows `bearer_token=set`, a traceback with local variables shows `'<login token>'`, and server text that repeats it is withheld. When a client sends both a key and a token, the station goes by the key. See [Security calls](api/security.md) for the users, the claim and the rest of `/api/security`.
+
+## Slowed down: 429
+
+In security mode `On` the station slows a client address down after too many wrong keys, login tokens or passwords (a few are free, then 2 s, doubling up to 15 minutes), and limits requests without a credential to anonymous endpoints. It answers **429** with `Retry-After`. The client raises [`AccordionQ2ThrottledError`](error-handling.md#slowed-down-429) with `retry_after` in seconds. To wait it out automatically, give the client a limit:
+
+```python
+client = AccordionQ2Client("https://station-12:5001", api_key=key, cert_sha256=pin,
+                           max_throttle_wait=10)
+```
+
+A 429 whose `Retry-After` is at most `max_throttle_wait` seconds is then waited out and the request sent again, up to three times; a longer one raises at once. A 429 comes before the station acts on a request, so a write is resent too, but never an upload from a stream that can't seek. The default, 0, never waits: a test station that sends a wrong key is better told at once than slowed down.

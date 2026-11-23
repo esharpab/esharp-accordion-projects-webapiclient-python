@@ -1,6 +1,6 @@
 # Error Handling
 
-All API errors raise `AccordionQ2ApiError`, importable from the top-level package. The exception carries the HTTP status code and the server's error message. A refusal for want of an API key or role is its subclass `AccordionQ2SecurityError` ([below](#security-errors-401-and-403)).
+All API errors raise `AccordionQ2ApiError`, importable from the top-level package. The exception carries the HTTP status code and the server's error message. A refusal for want of an API key or role is its subclass `AccordionQ2SecurityError` ([below](#security-errors-401-and-403)); a 429 is `AccordionQ2ThrottledError` ([below](#slowed-down-429)).
 
 ## Basic Usage
 
@@ -19,13 +19,15 @@ except AccordionQ2ApiError as e:
 |-------------|---------|---------------|
 | 3xx | Redirect | The client doesn't follow one. A 308 whose message names an https URL: the station is in security mode `On` and accepts only HTTPS; use that URL. Any other 3xx: usually a wrong base URL |
 | 400 | Bad Request | Invalid parameters, or `get_samples()` called after `reduced_set=True` |
-| 401 | Unauthorized | The station is in security mode `On` and the client sent no API key, or one it doesn't know: `AccordionQ2SecurityError` |
+| 401 | Unauthorized | The station is in security mode `On` and the client sent no API key, one it doesn't know, or an expired login token: `AccordionQ2SecurityError`; also a wrong password on a login call (reason `LOGIN_REFUSED`) |
 | 403 | Forbidden | The API key's role is too low (`AccordionQ2SecurityError`); or a change in a read-only folder ([Files](api/files.md)), a plain `AccordionQ2ApiError` |
 | 404 | Not Found | Channel, resource, or config file does not exist |
 | 409 | Conflict | The lease is held by someone else (`acquire`), a file exists, boot.config changed since it was read (`if_modified`), or a firmware update is running |
 | 423 | Locked | Another client holds the [lease](api/lease.md); changes and forced reads are refused |
+| 429 | Too Many Requests | Security mode `On`: too many failed keys, tokens or passwords from this address, or too many requests without a credential: `AccordionQ2ThrottledError` with `retry_after` |
 | 500 | Internal Server Error | Hardware manager encountered an error |
 | 501 | Not Implemented | System, firmware or service calls on a WebApi that isn't on a station |
+| 503 | Service Unavailable | The station is busy checking passwords (`retry_after` 5), logins are off, or (with an https URL in the message) HTTPS isn't available in `On` |
 | Connection refused | — | WebApi host is unreachable: `OSError` (e.g. `ConnectionRefusedError`, `TimeoutError`) |
 | Certificate | — | Over HTTPS, the certificate isn't the pinned one (`AccordionQ2CertificateError`) or isn't trusted (`ssl.SSLCertVerificationError`) |
 
@@ -37,6 +39,7 @@ except AccordionQ2ApiError as e:
 |-----------|------|-------------|
 | `status_code` | `int` | HTTP status code |
 | `message` | `str` | Error message from the server |
+| `retry_after` | `float \| None` | Seconds from the answer's `Retry-After` (a 429, a busy 503); `None` without one |
 
 The client automatically extracts error messages from RFC 7807 **ProblemDetails** responses
 (checking the `message`, `detail`, and `title` fields in that order), as well as plain-text
@@ -48,7 +51,7 @@ A station in security mode `On` refuses a request without a valid API key (401) 
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `reason` | `AccordionQ2SecurityReason` | `MISSING_API_KEY` (401, the client has no key), `INVALID_API_KEY` (401, the station doesn't know the key: wrong, or removed) or `ROLE_TOO_LOW` (403) |
+| `reason` | `AccordionQ2SecurityReason` | `MISSING_API_KEY` (401, the client has no key or token), `INVALID_API_KEY` (401, the station doesn't know the key: wrong, or removed), `INVALID_TOKEN` (401, the login token expired, was logged out or isn't valid, and no key was sent), `LOGIN_REFUSED` (401 from a login call itself: a wrong name or password, a wrong current password, a login past its 12 hours) or `ROLE_TOO_LOW` (403) |
 | `required_role` | `str \| None` | The role the request needs: `Viewer`, `Operator` or `Admin`, as the station said |
 | `status_code` | `int` | 401 or 403 |
 
@@ -65,6 +68,26 @@ except AccordionQ2SecurityError as e:
 ```
 
 A 403 that doesn't name a role, such as a change in a read-only folder, stays a plain `AccordionQ2ApiError`.
+
+## Slowed down (429)
+
+`AccordionQ2ThrottledError` (library 7.5.0), a subclass of `AccordionQ2ApiError` with `status_code` 429, is raised when the station slows this client down: in security mode `On` after too many wrong keys, login tokens or passwords from its address, or too many requests without a credential. The event stream raises it too.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `retry_after` | `float \| None` | Seconds to wait, from `Retry-After` (seconds or an HTTP date); `None` when the station didn't say (too many subscriptions on one stream) |
+| `station_message` | `str \| None` | The station's own text, e.g. `Too many failed keys from 10.0.0.9; try again in 4 s` |
+
+With `AccordionQ2Client(..., max_throttle_wait=10)` the client waits out a 429 whose `Retry-After` is at most 10 s and sends the request again, up to three times, and raises only after that or for a longer wait. It never resends an upload from a stream that can't seek. The default, 0, raises at once. See [Security: Slowed down](security.md#slowed-down-429).
+
+```python
+from accordionq2 import AccordionQ2ThrottledError
+
+try:
+    client.security.login("anna", password)
+except AccordionQ2ThrottledError as e:
+    print(f"Slowed down; try again in {e.retry_after:.0f} s")
+```
 
 ## Certificate Errors
 

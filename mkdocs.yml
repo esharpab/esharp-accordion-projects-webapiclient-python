@@ -54,6 +54,7 @@ nav:
       - Files: api/files.md
       - Firmware: api/firmware.md
       - Audit: api/audit.md
+      - Security (logins, users, keys): api/security.md
   - Models & Enums:
       - Models: reference/models.md
       - Enumerations: reference/enums.md

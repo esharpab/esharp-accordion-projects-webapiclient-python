@@ -21,6 +21,7 @@ from .media import MediaGroup
 from .modules import ModulesGroup
 from .numeric_results import NumericResultsGroup
 from .resources import ResourcesGroup
+from .security import SecurityGroup
 from .subscriptions import SubscriptionsGroup
 from .system import SystemGroup
 
@@ -66,10 +67,19 @@ class AccordionQ2Client:
                          The client then accepts exactly that certificate, self-signed
                          or reached by IP address, and refuses any other before sending
                          anything. Needs an ``https://`` base URL.
+        bearer_token:    A login token (firmware 7.1.0) to send as ``Authorization: Bearer``,
+                         e.g. one kept from an earlier ``client.security.login()``. Usually
+                         left None: :meth:`SecurityGroup.login` sets the client's token.
+        max_throttle_wait: Seconds of a 429's ``Retry-After`` the client waits out by itself
+                         before sending the request again (at most three times, never for an
+                         upload stream that can't seek). 0 (default): a 429 raises
+                         :class:`AccordionQ2ThrottledError` at once.
 
     A station is meant for an intranet. Base URLs may be IPv6 literals in brackets,
     with a zone id as ``%eth0`` or ``%25eth0``: ``http://[fe80::1%eth0]:5000``.
-    Bearer tokens are not supported: the station doesn't issue them yet.
+    People log in with ``client.security.login(name, password)`` (firmware 7.1.0, over
+    HTTPS): the client then sends the token as ``Authorization: Bearer``. Machines use
+    an API key; the station identifies a request by its key first when both are sent.
 
     Raises:
         ValueError: The base URL, key or fingerprint is malformed, or *cert_sha256*
@@ -95,6 +105,8 @@ class AccordionQ2Client:
         *,
         api_key: str | None = None,
         cert_sha256: str | None = None,
+        bearer_token: str | None = None,
+        max_throttle_wait: float = 0.0,
     ) -> None:
         # So a traceback's locals show no key.
         api_key = _secret(api_key)
@@ -107,6 +119,8 @@ class AccordionQ2Client:
             default_headers=default_headers,
             api_key=api_key,
             cert_sha256=cert_sha256,
+            bearer_token=bearer_token,
+            max_throttle_wait=max_throttle_wait,
         )
         self.resources = ResourcesGroup(self._session)
         self.channels = ChannelsGroup(self._session)
@@ -128,6 +142,7 @@ class AccordionQ2Client:
         self.system = SystemGroup(self._session)
         self.files = FilesGroup(self._session)
         self.firmware = FirmwareGroup(self._session)
+        self.security = SecurityGroup(self._session)
 
     def __repr__(self) -> str:
         # getattr: a traceback may show a client whose __init__ raised.

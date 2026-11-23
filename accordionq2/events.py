@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from types import TracebackType
 from typing import Any
 
+from . import _base
 from ._base import HttpSession
 
 #: The contract's limit: no data at all (events or pings) for this long means a dead stream.
@@ -127,25 +128,39 @@ class EventsGroup:
     def open(self, silence_limit: float = SILENCE_LIMIT_SECONDS) -> EventStream:
         """Open ``GET /api/events`` on a new connection and read its ``hello``.
 
-        The stream carries the client's API key and certificate pin like every
-        request. Raises :class:`AccordionQ2SecurityError` when the station
-        refuses it (401, or 403 below ``Viewer``), and :class:`AccordionQ2ApiError`
-        when it can't be opened otherwise (404 for a WebApi without it).
+        The stream carries the client's API key or login token and certificate pin
+        like every request. Raises :class:`AccordionQ2SecurityError` when the station
+        refuses it (401, or 403 below ``Viewer``), :class:`AccordionQ2ThrottledError`
+        for a 429 the client doesn't wait out (``max_throttle_wait``), and
+        :class:`AccordionQ2ApiError` when it can't be opened otherwise (404 for a
+        WebApi without it). In ``On`` the station ends a stream when the credential it
+        was opened with stops working: for a login token, at that token's expiry
+        even after a renewal, so reopen the stream with the renewed token.
         """
-        conn = self._session.new_connection(timeout=silence_limit)
-        try:
-            conn.request(
-                "GET",
-                self._session.full_path("api/events"),
-                headers=self._session.request_headers({"Accept": "text/event-stream"}),
-            )
-            response = conn.getresponse()
-            if not 200 <= response.status < 300:
-                body = response.read()
-                raise self._session.error_for(
-                    response.status, body, "The event stream couldn't be opened"
+        resends = 0
+        while True:
+            conn = self._session.new_connection(timeout=silence_limit)
+            try:
+                conn.request(
+                    "GET",
+                    self._session.full_path("api/events"),
+                    headers=self._session.request_headers({"Accept": "text/event-stream"}),
                 )
-        except BaseException:
+                response = conn.getresponse()
+                if 200 <= response.status < 300:
+                    break
+                body = response.read()
+                headers = getattr(response, "headers", None)
+                # A 429 waited out as for any request (max_throttle_wait), on a new connection
+                delay = self._session.throttle_wait(response.status, headers, resends)
+                if delay is None:
+                    raise self._session.error_for(
+                        response.status, body, "The event stream couldn't be opened", headers
+                    )
+            except BaseException:
+                conn.close()
+                raise
             conn.close()
-            raise
+            resends += 1
+            _base._sleep(delay)
         return EventStream(conn, response)

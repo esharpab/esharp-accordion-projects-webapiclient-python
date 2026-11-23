@@ -13,6 +13,11 @@ prints ``'<api key>'`` for the client's own copies. ``http.client``'s frames
 still hold the encoded request, key included, and its ``debuglevel`` prints it.
 ``http.client`` never follows redirects, so the key goes only to the host in the
 base URL.
+
+A person's login token (firmware 7.1.0) goes as ``Authorization: Bearer``; the
+client keeps it as a :class:`_Secret` too and withholds server text that repeats
+it. A 429 is :class:`AccordionQ2ThrottledError` with the station's ``Retry-After``;
+with ``max_throttle_wait`` the session waits and resends (FW7_PLAN CLI-05 follow-up).
 """
 
 from __future__ import annotations
@@ -25,6 +30,9 @@ import ssl
 import threading
 import time
 import uuid
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import BinaryIO
 from urllib.parse import urlparse
 
@@ -34,10 +42,18 @@ from .exceptions import (
     AccordionQ2CertificateError,
     AccordionQ2SecurityError,
     AccordionQ2SecurityReason,
+    AccordionQ2ThrottledError,
 )
 
 #: The header that carries the station API key.
 API_KEY_HEADER = "X-Api-Key"
+
+#: How many times a 429 is waited out and the request resent, at most, with ``max_throttle_wait``.
+#: A few: the station's block doubles with each further failure, so waiting longer rarely helps.
+MAX_THROTTLE_RESENDS = 3
+
+# The sleep the throttle wait uses; tests replace it.
+_sleep = time.sleep
 
 # Methods that may be sent twice: they don't change anything on the station.
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -89,6 +105,69 @@ def _parse_base_url(base_url: str) -> tuple[str, str, int, str]:
     )
 
 
+class HttpResponse(tuple[int, bytes]):
+    """``(status, body)`` as :meth:`HttpSession.request` returns it, with the response's headers.
+
+    A tuple of two, so ``status, data = session.request(...)`` works as before 7.5.0;
+    :attr:`headers` holds the headers (``Retry-After``); read one with :func:`header_value`.
+    """
+
+    headers: object
+
+    def __new__(cls, status: int, body: bytes, headers: object = None) -> HttpResponse:
+        response = super().__new__(cls, (status, body))
+        response.headers = headers if headers is not None else {}
+        return response
+
+    @property
+    def status(self) -> int:
+        return self[0]
+
+    @property
+    def body(self) -> bytes:
+        return self[1]
+
+
+def header_value(headers: object, name: str) -> str | None:
+    """The header *name* (any case) of *headers* (an ``HTTPMessage`` or a mapping), or None."""
+    if headers is None:
+        return None
+    if isinstance(headers, http.client.HTTPMessage):
+        value = headers.get(name)
+        return None if value is None else str(value)
+    if isinstance(headers, Mapping):
+        for key, value in headers.items():
+            if isinstance(key, str) and key.lower() == name.lower():
+                return str(value)
+    return None
+
+
+def parse_retry_after(value: str | None, now: datetime | None = None) -> float | None:
+    """``Retry-After`` as seconds from *now*: delta-seconds or an HTTP date (RFC 9110 10.2.3).
+
+    None when it is missing or can't be read. A date in the past is 0. The station sends whole
+    seconds, at least 1.
+    """
+    if value is None:
+        return None
+    text = value.strip()
+    if text.isascii() and text.isdigit():
+        return float(int(text))
+    try:
+        when = parsedate_to_datetime(text)
+    except (TypeError, ValueError, IndexError):
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)  # RFC 9110's IMF-fixdate is GMT
+    return max(0.0, (when - (now or datetime.now(UTC))).total_seconds())
+
+
+def _is_loopback_host(host: str) -> bool:
+    """Whether *host* is this computer (``localhost``, 127.0.0.0/8, ``::1``)."""
+    name = host.partition("%")[0].lower()
+    return name == "localhost" or name.startswith("127.") or name in ("::1", "0:0:0:0:0:0:0:1")
+
+
 class _Secret(str):
     """A str that ``repr()`` doesn't show: the API key, as the client holds it.
 
@@ -116,6 +195,31 @@ def _secret_headers(headers: dict[str, str] | None) -> dict[str, str] | None:
         n: (_Secret(v) if n.lower() == "x-api-key" and isinstance(v, str) else v)
         for n, v in headers.items()
     }
+
+
+class _SecretToken(_Secret):
+    """A login token as the client holds it: ``repr()`` shows ``'<login token>'``."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "'<login token>'"
+
+
+def _validate_token(token: str | None) -> _SecretToken | None:
+    if token is None:
+        return None
+    # The messages never contain the token itself.
+    if not isinstance(token, str):
+        raise TypeError("The login token is a str")
+    token = _SecretToken(token.strip())  # before a check that can raise: the frame shows no token
+    if token == "":
+        raise ValueError("The login token is empty; use None for none")
+    if any(not ("!" <= c <= "~") for c in token):
+        raise ValueError(
+            "The login token contains characters a header can't carry (only visible ASCII)"
+        )
+    return token
 
 
 def _validate_api_key(api_key: str | None) -> _Secret | None:
@@ -227,6 +331,14 @@ class HttpSession:
                         request.
         cert_sha256:    The SHA-256 fingerprint of the station's HTTPS
                         certificate: exactly that certificate is accepted.
+        bearer_token:   A login token (firmware 7.1.0), sent as
+                        ``Authorization: Bearer``; it replaces an ``Authorization``
+                        from *auth* or *default_headers*. The station identifies a
+                        request by its ``X-Api-Key`` first when both are sent.
+        max_throttle_wait: Seconds a 429 may ask the client to wait and be waited
+                        out: the request is resent after ``Retry-After`` when that is
+                        at most this, up to :data:`MAX_THROTTLE_RESENDS` times, never
+                        for a stream that can't seek. 0 (default) never waits.
 
     Raises:
         ValueError: The base URL, key or fingerprint is malformed, or
@@ -243,10 +355,15 @@ class HttpSession:
         default_headers: dict[str, str] | None = None,
         api_key: str | None = None,
         cert_sha256: str | None = None,
+        bearer_token: str | None = None,
+        max_throttle_wait: float = 0.0,
     ) -> None:
         # So a traceback's locals show no key.
         api_key = _secret(api_key)
         default_headers = _secret_headers(default_headers)
+        bearer_token = _validate_token(bearer_token)
+        self._bearer: _SecretToken | None = bearer_token
+        self.max_throttle_wait = max_throttle_wait
         self._scheme, self._host, self._port, self._path_prefix = _parse_base_url(base_url)
         self._timeout = timeout
         self._verify = verify
@@ -303,11 +420,12 @@ class HttpSession:
             return "HttpSession(<not initialised>)"
         bracketed = f"[{host}]" if ":" in host else host
         has_key = getattr(self, "_api_key", None) is not None
+        token = ", bearer_token=set" if getattr(self, "_bearer", None) is not None else ""
         return (
             f"HttpSession('{getattr(self, '_scheme', '?')}://{bracketed}:"
             f"{getattr(self, '_port', '?')}{getattr(self, '_path_prefix', '')}', "
             f"api_key={'set' if has_key else 'none'}, "
-            f"cert_sha256={getattr(self, '_pin', None) or 'none'})"
+            f"cert_sha256={getattr(self, '_pin', None) or 'none'}{token})"
         )
 
     @property
@@ -320,6 +438,35 @@ class HttpSession:
         """Whether this session sends an ``api_key`` (the key itself is never exposed)."""
         return self._api_key is not None
 
+    @property
+    def has_bearer_token(self) -> bool:
+        """Whether this session sends a login token (the token itself is never exposed)."""
+        return getattr(self, "_bearer", None) is not None
+
+    def set_bearer_token(self, token: str | None) -> None:
+        """Send *token* as ``Authorization: Bearer`` from now on; None stops sending one."""
+        validated = _validate_token(token)
+        with self._lock:
+            self._bearer = validated
+
+    @property
+    def is_https_or_loopback(self) -> bool:
+        """Whether a password may be sent: the base URL is ``https://`` or this computer.
+
+        The station refuses a password over plain HTTP from another host anyway (400), but by
+        then it has crossed the network in clear text, so the client doesn't send it.
+        """
+        return self._scheme == "https" or _is_loopback_host(self._host)
+
+    def require_https_or_loopback(self, what: str) -> None:
+        """Raise ``ValueError`` before *what* would send a secret in clear text to another host."""
+        if not self.is_https_or_loopback:
+            raise ValueError(
+                f"{what} needs HTTPS (an https:// base URL) or the station itself: it would send "
+                "a secret across the network in clear text, and the station refuses it over "
+                "plain HTTP anyway"
+            )
+
     def request_headers(self, extra: dict[str, str] | None = None) -> dict[str, str]:
         """The headers for one request: the default ones, the API key, then *extra*.
 
@@ -331,21 +478,32 @@ class HttpSession:
             for name in [n for n in headers if n.lower() == API_KEY_HEADER.lower()]:
                 del headers[name]
             headers[API_KEY_HEADER] = self._api_key
+        bearer = getattr(self, "_bearer", None)
+        if bearer is not None:
+            for name in [n for n in headers if n.lower() == "authorization"]:
+                del headers[name]
+            headers["Authorization"] = _SecretToken(f"Bearer {bearer}")
         if extra:
             headers.update(extra)
         return headers
 
     def error_for(
-        self, status: int, body: bytes, fallback: str | None = None
+        self,
+        status: int,
+        body: bytes,
+        fallback: str | None = None,
+        headers: object = None,
     ) -> AccordionQ2ApiError:
-        """The exception for a refused request with *status* and *body*.
+        """The exception for a refused request with *status*, *body* and *headers*.
 
         :class:`AccordionQ2SecurityError` for 401, and for a 403 that names the
         role it needs, with the server's error after the client's own text;
+        :class:`AccordionQ2ThrottledError` for 429 with its ``Retry-After``;
         otherwise :class:`AccordionQ2ApiError` with the server's error, or
-        *fallback*, or the body. Server text that would repeat the API key is
-        withheld.
+        *fallback*, or the body, and ``retry_after`` when the answer had one.
+        Server text that would repeat the API key or the login token is withheld.
         """
+        retry_after = parse_retry_after(header_value(headers, "Retry-After"))
         raw = body.decode("utf-8", errors="replace")
         server_message: str | None = None
         requires: str | None = None
@@ -363,18 +521,38 @@ class HttpSession:
             requires = str(role) if role else None
         server_message = self._scrub(server_message)
 
+        if status == 429:
+            wait = "" if retry_after is None else f"; retry after {retry_after:.0f} s"
+            return AccordionQ2ThrottledError(
+                f"{server_message or 'Too many requests'} (HTTP 429: the station is slowing "
+                f"this client down{wait})",
+                retry_after,
+                server_message,
+            )
         if status == 401:
+            if requires == "Anonymous" and server_message is not None:
+                # A login call's own refusal (a wrong password, a login past renewal), not the
+                # station's credential check, which always names the role the endpoint needs
+                return AccordionQ2SecurityError(
+                    status, AccordionQ2SecurityReason.LOGIN_REFUSED, None, server_message
+                )
             if self._api_key is not None:
                 reason = AccordionQ2SecurityReason.INVALID_API_KEY
                 message = (
                     "The station doesn't accept this client's API key (X-Api-Key): it is "
                     "wrong, or was removed on the station"
                 )
+            elif getattr(self, "_bearer", None) is not None:
+                reason = AccordionQ2SecurityReason.INVALID_TOKEN
+                message = (
+                    "The station doesn't accept this client's login token: it expired, was "
+                    "logged out, or isn't valid; log in again (client.security.login)"
+                )
             else:
                 reason = AccordionQ2SecurityReason.MISSING_API_KEY
                 message = (
                     "The station needs an API key (X-Api-Key) and this client has none; "
-                    "pass api_key= to AccordionQ2Client"
+                    "pass api_key= to AccordionQ2Client, or log in (client.security.login)"
                 )
             # The server's own reason too: the 401 may come from something else, e.g. a proxy.
             if server_message is not None:
@@ -395,14 +573,39 @@ class HttpSession:
                 "never does; the client doesn't follow it. Check the base URL",
             )
         return AccordionQ2ApiError(
-            status, server_message or fallback or self._scrub(raw) or f"HTTP {status}"
+            status,
+            server_message or fallback or self._scrub(raw) or f"HTTP {status}",
+            retry_after=retry_after,
         )
 
     def _scrub(self, text: str | None) -> str | None:
-        """*text* from the server, unless it would repeat the API key."""
-        if text is None or self._api_key is None or self._api_key not in text:
+        """*text* from the server, unless it would repeat the API key or the login token."""
+        if text is None:
             return text
-        return "(withheld: it contained the API key)"
+        if self._api_key is not None and self._api_key in text:
+            return "(withheld: it contained the API key)"
+        bearer = getattr(self, "_bearer", None)
+        if bearer is not None and bearer in text:
+            return "(withheld: it contained the login token)"
+        return text
+
+    def throttle_wait(self, status: int, headers: object, resends: int) -> float | None:
+        """How long to wait before resending a request answered *status*; None not to resend.
+
+        Only a 429 whose ``Retry-After`` is at most :attr:`max_throttle_wait`, and only
+        :data:`MAX_THROTTLE_RESENDS` times (*resends* is how many were sent again already). A
+        429 comes before the station acts on a request (the credential throttle and the
+        anonymous limit run before any endpoint, a login's before the password is checked), so
+        a resend can't run it twice; a 429 without ``Retry-After`` (too many subscriptions on
+        one stream) is never waited out.
+        """
+        limit = getattr(self, "max_throttle_wait", 0.0)
+        if status != 429 or limit <= 0 or resends >= MAX_THROTTLE_RESENDS:
+            return None
+        delay = parse_retry_after(header_value(headers, "Retry-After"))
+        if delay is None or delay > limit:
+            return None
+        return delay
 
     def set_default_header(self, name: str, value: str | None) -> None:
         """Send *name* with every request from now on; None stops sending it (the lease id)."""
@@ -441,17 +644,44 @@ class HttpSession:
         path: str,
         body: bytes | BinaryIO | None = None,
         headers: dict[str, str] | None = None,
-    ) -> tuple[int, bytes]:
-        """Send *method* to *path* and return ``(status, body_bytes)``.
+    ) -> HttpResponse:
+        """Send *method* to *path* and return ``(status, body_bytes)`` (an :class:`HttpResponse`).
 
         *body* may be an open binary file: ``http.client`` sends it as it reads it, so a large
         upload is never held in memory. A retry starts it again from where it was.
+
+        With :attr:`max_throttle_wait`, a 429 is waited out and the request resent (see
+        :meth:`throttle_wait`), but not a stream that can't seek: its first send consumed it.
+        The wait happens outside the session's lock.
         """
+        start = body.tell() if hasattr(body, "read") and body.seekable() else None  # type: ignore[union-attr]
+        rewindable = not hasattr(body, "read") or start is not None
+        resends = 0
+        while True:
+            response = self._send(method, path, body, headers, start)
+            delay = (
+                self.throttle_wait(response.status, response.headers, resends)
+                if rewindable
+                else None
+            )
+            if delay is None:
+                return response
+            resends += 1
+            _sleep(delay)
+
+    def _send(
+        self,
+        method: str,
+        path: str,
+        body: bytes | BinaryIO | None,
+        headers: dict[str, str] | None,
+        start: int | None,
+    ) -> HttpResponse:
+        """One send of :meth:`request`, with its one retry after a failed connection."""
         # Avoid double slashes when path_prefix is empty or path starts with /
         full_path = "{}/{}".format(self._path_prefix, path.lstrip("/"))
         merged = self.request_headers(headers)
         safe = method.upper() in _SAFE_METHODS
-        start = body.tell() if hasattr(body, "read") and body.seekable() else None  # type: ignore[union-attr]
         with self._lock:
             if (
                 self._conn is not None
@@ -476,7 +706,7 @@ class HttpSession:
                     resp = self._conn.getresponse()  # type: ignore[union-attr]
                     data = resp.read()
                     self._last_used = time.monotonic()
-                    return resp.status, data
+                    return HttpResponse(resp.status, data, getattr(resp, "headers", None))
                 except (http.client.HTTPException, OSError) as error:
                     self._close_conn()
                     if isinstance(error, ssl.SSLCertVerificationError):
@@ -571,7 +801,9 @@ class ApiGroupBase:
         else:
             encoded = json.dumps(body).encode("utf-8")
             headers = {**headers, "Content-Type": "application/json"}
-        status, data = self._session.request(method, path, body=encoded, headers=headers)
+        response = self._session.request(method, path, body=encoded, headers=headers)
+        status, data = response
         if not 200 <= status < 300:
-            raise self._session.error_for(status, data)
+            # A mocked session may return a plain (status, body) tuple: no headers then
+            raise self._session.error_for(status, data, headers=getattr(response, "headers", None))
         return data

@@ -27,6 +27,7 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
     client.files             # Files in the station's folders
     client.firmware          # Firmware releases and updates
     client.audit             # WebApi request audit log
+    client.security          # Logins, users, keys, certificate, event log, firewall, extensions, factory reset
 ```
 
 | Group | Description | Details |
@@ -50,3 +51,4 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 | [`files`](files.md) | Browse, download, upload, move and delete files in the station's folders | [→](files.md) |
 | [`firmware`](firmware.md) | List releases, install signed releases, update offline from a package | [→](firmware.md) |
 | [`audit`](audit.md) | WebApi request audit log | [→](audit.md) |
+| [`security`](security.md) | Logins (a Bearer token), users, API keys, the certificate, the security event log, the firewall and SSH keys, extensions, the factory reset (firmware 7.1.0) | [→](security.md) |

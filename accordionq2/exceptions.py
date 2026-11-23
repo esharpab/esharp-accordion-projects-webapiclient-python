@@ -13,12 +13,16 @@ class AccordionQ2ApiError(Exception):
     """Raised when the AccordionQ2 API returns a non-success HTTP status code.
 
     A refusal for want of an API key or a role is the subclass
-    :class:`AccordionQ2SecurityError`.
+    :class:`AccordionQ2SecurityError`; a 429 (slowed down) is
+    :class:`AccordionQ2ThrottledError`.
     """
 
-    def __init__(self, status_code: int, message: str) -> None:
+    def __init__(self, status_code: int, message: str, *, retry_after: float | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+        #: Seconds the station asked the client to wait (its ``Retry-After``), None when it
+        #: didn't say: a 429, or a 503 while the station is busy checking passwords.
+        self.retry_after = retry_after
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.status_code}, {self.args[0]!r})"
@@ -33,6 +37,12 @@ class AccordionQ2SecurityReason(StrEnum):
     INVALID_API_KEY = "InvalidApiKey"
     #: 403: the key is known but its role is too low; see ``required_role``.
     ROLE_TOO_LOW = "RoleTooLow"
+    #: 401: the station doesn't accept this client's login token (it expired, was logged out,
+    #: or isn't valid) and the client sent no API key; log in again (firmware 7.1.0).
+    INVALID_TOKEN = "InvalidToken"
+    #: 401 from a login call itself (``requires`` ``Anonymous``): a wrong user name or
+    #: password, a wrong current password, or a login that can't be renewed any more.
+    LOGIN_REFUSED = "LoginRefused"
 
 
 class AccordionQ2SecurityError(AccordionQ2ApiError):
@@ -55,6 +65,29 @@ class AccordionQ2SecurityError(AccordionQ2ApiError):
         self.reason = reason
         #: The role the request needs (``Viewer``, ``Operator`` or ``Admin``), if the station said.
         self.required_role = required_role
+
+
+class AccordionQ2ThrottledError(AccordionQ2ApiError):
+    """Raised when the station answers 429: it is slowing this client down (firmware 7.1.0).
+
+    In security mode ``On`` a client address that sent too many wrong API keys, login tokens
+    or passwords is blocked for a while (2 s, doubling up to 15 min), and too many requests
+    without a credential are limited; :attr:`retry_after` says for how long. The client waits
+    and resends by itself only when it was made with ``max_throttle_wait`` (FW7_PLAN CLI-05
+    follow-up).
+    """
+
+    def __init__(
+        self, message: str, retry_after: float | None, station_message: str | None
+    ) -> None:
+        super().__init__(429, message, retry_after=retry_after)
+        #: The station's own text (its ``error``), None when it sent none.
+        self.station_message = station_message
+
+    def __reduce__(
+        self,
+    ) -> tuple[type[AccordionQ2ThrottledError], tuple[str, float | None, str | None]]:
+        return (type(self), (self.args[0], self.retry_after, self.station_message))
 
 
 class AccordionQ2CertificateError(ssl.SSLCertVerificationError):
