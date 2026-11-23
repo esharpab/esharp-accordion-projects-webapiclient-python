@@ -767,6 +767,55 @@ class FactoryResetRecord:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class RecoveryWindow:
+    """Whether a recovery drive for the station is in it (firmware 7.1.0).
+
+    ``window`` is ``open`` while an admin password can be set (at most 15 minutes, until the
+    drive is taken out, one reset per insertion), else ``closed``.
+    """
+
+    window: str
+    #: When it closes at the latest (ISO 8601); None while closed.
+    until: str | None
+    #: Whether the station's USB ports are off: the drive then needs a restart of the station.
+    usb_ports_off: bool
+    hint: str
+    steps: tuple[str, ...]
+
+    @property
+    def is_open(self) -> bool:
+        return self.window.lower() == "open"
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> RecoveryWindow:
+        return cls(
+            window=str(d.get("window", "closed")),
+            until=_opt_str(d.get("until")),
+            usb_ports_off=bool(d.get("usbPortsOff")),
+            hint=str(d.get("hint", "")),
+            steps=_strs(d.get("steps")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryReset:
+    """What a reset with the recovery drive did: the user, whether it was made, what to do now."""
+
+    user: UserInfo
+    created: bool
+    message: str
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> RecoveryReset:
+        user = d.get("user")
+        return cls(
+            user=UserInfo.from_dict(user if isinstance(user, dict) else {}),
+            created=bool(d.get("created")),
+            message=str(d.get("message", "")),
+        )
+
+
 def _q(value: str) -> str:
     return quote(value, safe="")
 
@@ -775,6 +824,10 @@ def _q(value: str) -> str:
 # by the key when both are sent, and would then not renew, log out or change the login's password
 # (CLI-05 follow-up). A None value drops the header (HttpSession.request_headers).
 _TOKEN_ONLY: dict[str, str] = {API_KEY_HEADER: None}  # type: ignore[dict-item]
+
+# The headers of a call that goes without any credential (the recovery drive's reset): neither the
+# key nor the login token rides on it.
+_NO_CREDENTIALS: dict[str, str] = {API_KEY_HEADER: None, "Authorization": None}  # type: ignore[dict-item]
 
 
 class SecurityGroup(ApiGroupBase):
@@ -1169,6 +1222,54 @@ class SecurityGroup(ApiGroupBase):
                 return None
             raise
         return FactoryResetRecord.from_dict(self._obj(d))
+
+    # ----- the recovery drive (firmware 7.1.0) -----
+
+    def get_recovery(self) -> RecoveryWindow | None:
+        """Whether a recovery drive for this station is in it (anyone, every mode); None on a
+        station before 7.1.0 (404)."""
+        try:
+            d = self._get_json("api/security/recovery")
+        except AccordionQ2ApiError as error:
+            if error.status_code == 404:
+                return None
+            raise
+        return RecoveryWindow.from_dict(self._obj(d))
+
+    def download_recovery_drive_file(self) -> bytes:
+        """The recovery drive's file, ``accordion-recovery.json`` (anyone, every mode).
+
+        Save it under that name in the top folder of a FAT32 or exFAT USB drive and plug that
+        into the station. It names the station and holds no secret.
+        """
+        return self._get_bytes("api/security/recovery/drive-file")
+
+    def recovery_reset_admin(self, password: str, user: str | None = None) -> RecoveryReset:
+        """Set an admin's password while a recovery drive for this station is in it (anyone,
+        over HTTPS or on the station). Sent without the key or the login token.
+
+        *user* (default ``admin``) gets the password; it is made as Admin if missing, made
+        Admin if not, and its logins end. The mode, the keys and the other users stay. One
+        reset per insertion of the drive. 409 when no recovery drive is in the station, 400 for
+        a password the station refuses. This client doesn't log in: call :meth:`login`.
+        """
+        password = _hide(password)
+        self._session.require_https_or_loopback("A password reset with the recovery drive")
+        body: dict[str, Any] = {"password": password}
+        if user is not None:
+            body["user"] = user
+        return RecoveryReset.from_dict(
+            self._obj(
+                json.loads(
+                    self._request(
+                        "POST",
+                        "api/security/recovery/reset-admin",
+                        body=body,
+                        headers=dict(_NO_CREDENTIALS),
+                    )
+                )
+            )
+        )
 
     # ----- helpers -----
 

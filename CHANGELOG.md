@@ -22,6 +22,12 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
   `last_factory_reset`), with their models (`LoginResponse`, `UserInfo`, `MeInfo`, `SecurityState`, `CertificateInfo`,
   `SecurityEvents`, `HostSecurity`, `HostSettings`, `SshKey`, `ExtensionsReport`, `FactoryResetPreview`, ...) and
   `SecurityMode`, `StationRole`. docs/api/security.md.
+- **The recovery drive** (firmware 7.1.0), for a station whose admin password is lost: `get_recovery()`
+  (`RecoveryWindow`: whether the recovery window is open, until when, whether the USB ports are off; `None` before
+  7.1.0), `download_recovery_drive_file()` (the bytes of `accordion-recovery.json`, to copy to a USB drive; it names
+  the station and holds no secret) and `recovery_reset_admin(password, user=None)` (`RecoveryReset`; while a recovery
+  drive for the station is in it, anyone at the station can set an admin password; sent without the key or the token,
+  never over plain HTTP to another host; 409 without a drive). None needs a credential.
 - `HostSettings.container_ports` and `container_from` (firmware 7.1.0): the TCP ports Docker publishes on the
   station that stay reachable from other hosts in security mode `On`, and from where; every other connection
   forwarded to a container from outside the station is dropped in `On`.

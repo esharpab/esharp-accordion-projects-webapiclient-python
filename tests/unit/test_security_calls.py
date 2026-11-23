@@ -135,6 +135,7 @@ class TestLogin:
             lambda: station.security.create_user("bo", "Viewer", PASSWORD),
             lambda: station.security.set_user_password("9f8e7d6c", PASSWORD),
             lambda: station.security.install_certificate("cert", "key"),
+            lambda: station.security.recovery_reset_admin(PASSWORD),
         ):
             with pytest.raises(ValueError, match="HTTPS") as info:
                 call()
@@ -970,6 +971,75 @@ class TestFactoryReset:
         record = station.security.last_factory_reset()
         assert record is not None and record.rebooted and record.by == "user:1:admin"
         assert station.security.last_factory_reset() is None
+
+
+# ---------------------------------------------------------------------------
+# The recovery drive (firmware 7.1.0)
+# ---------------------------------------------------------------------------
+
+
+class TestRecoveryDrive:
+    def test_the_window(self):
+        station = Station(
+            (
+                200,
+                {
+                    "window": "open",
+                    "until": "2026-11-23T12:15:00+00:00",
+                    "usbPortsOff": True,
+                    "hint": "A recovery drive for this station is in it",
+                    "steps": ["one", "two"],
+                },
+            ),
+            (404, b""),
+        )
+        window = station.security.get_recovery()
+        assert window is not None and window.is_open and window.usb_ports_off
+        assert window.until == "2026-11-23T12:15:00+00:00"
+        assert window.steps == ("one", "two")
+        assert station.sent()[:2] == ("GET", "/api/security/recovery")
+        assert station.security.get_recovery() is None  # a station before 7.1.0
+
+    def test_the_drive_file(self):
+        data = (
+            b'{"kind":"accordion-recovery","station":"A002531","created":"2026-11-23T10:00:00Z"}\n'
+        )
+        station = Station((200, data))
+        assert station.security.download_recovery_drive_file() == data
+        assert station.sent()[:2] == ("GET", "/api/security/recovery/drive-file")
+
+    def test_the_reset_goes_without_the_key_and_the_token_and_doesnt_log_in(self):
+        answer = {
+            "user": {**USER, "name": "admin", "role": "Admin"},
+            "created": False,
+            "message": "Sign in",
+        }
+        station = Station((200, answer), (200, answer), api_key=KEY, bearer_token=TOKEN)
+        result = station.security.recovery_reset_admin(PASSWORD)
+        method, path, body, headers = station.sent()
+        assert (method, path) == ("POST", "/api/security/recovery/reset-admin")
+        assert body == {"password": PASSWORD}
+        assert "X-Api-Key" not in headers and "Authorization" not in headers
+        assert result.user.name == "admin" and not result.created
+        assert station.session.request_headers()["Authorization"] == f"Bearer {TOKEN}"
+        station.security.recovery_reset_admin(PASSWORD, user="lab")
+        assert station.sent()[2] == {"password": PASSWORD, "user": "lab"}
+
+    def test_without_a_drive_it_is_the_stations_409(self):
+        station = Station(
+            (
+                409,
+                {
+                    "error": "No recovery drive is in the station: insert the recovery drive",
+                    "requires": "Anonymous",
+                },
+            )
+        )
+        with pytest.raises(AccordionQ2ApiError) as info:
+            station.security.recovery_reset_admin(PASSWORD)
+        assert info.value.status_code == 409
+        assert "insert the recovery drive" in str(info.value)
+        assert PASSWORD not in str(info.value)
 
 
 def test_on_the_client():

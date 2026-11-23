@@ -111,6 +111,26 @@ Whoever holds an installed SSH key gets a shell on the station: treat adding one
 | `set_extension_uploads(minutes)` | `(str \| None, list[str])` | `PUT /api/security/extension-uploads`: open the file API's changes to the extensions folder in `On` for 1 to 1440 minutes, or close (0); until when, and warnings |
 | `set_module_image_role(role)` | `(str, list[str])` | `PUT /api/security/module-images`: `Admin` (default) or `Operator` for module images in `On` |
 
+## The recovery drive
+
+For a station whose admin password is lost, by someone at the station. No credential is needed: the protection is that a recovery drive has to be plugged into the station (firmware 7.1.0).
+
+| Call | Returns | What it does |
+|---|---|---|
+| `get_recovery()` | `RecoveryWindow \| None` | `GET /api/security/recovery`: `is_open` while a recovery drive for this station is in it (at most 15 minutes, until it is taken out, one reset per insertion), `until`, `usb_ports_off` (the drive then needs a restart of the station), `hint`, `steps`; `None` before 7.1.0 |
+| `download_recovery_drive_file()` | `bytes` | `GET /api/security/recovery/drive-file`: `accordion-recovery.json`, for the top folder of a FAT32 or exFAT USB drive. It names the station and holds no secret |
+| `recovery_reset_admin(password, user=None)` | `RecoveryReset` | `POST /api/security/recovery/reset-admin` without the key or the token, over HTTPS or on the station: *user* (default `admin`) gets the password, is made Admin (made if missing) and its logins end; the mode, the keys and the other users stay. 409 when no recovery drive is in the station, 400 for a password the station refuses. This client doesn't log in |
+
+```python
+with open("E:/accordion-recovery.json", "wb") as f:   # the top folder of a FAT32 or exFAT USB drive
+    f.write(client.security.download_recovery_drive_file())
+# plug the drive into the station (restart the station with it in when its USB ports are off), then:
+window = client.security.get_recovery()
+if window is not None and window.is_open:
+    client.security.recovery_reset_admin(new_password)
+client.security.login("admin", new_password)
+```
+
 ## The factory reset
 
 | Method | Returns | Description |
