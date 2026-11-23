@@ -10,6 +10,7 @@ from .capabilities import CapabilitiesGroup
 from .channels import ChannelsGroup
 from .comm import CommGroup
 from .connection import ConnectionGroup
+from .docs import DocsGroup
 from .drummer import DrummerGroup
 from .events import EventsGroup
 from .files import FilesGroup
@@ -143,6 +144,7 @@ class AccordionQ2Client:
         self.files = FilesGroup(self._session)
         self.firmware = FirmwareGroup(self._session)
         self.security = SecurityGroup(self._session)
+        self.docs = DocsGroup(self._session)
 
     def __repr__(self) -> str:
         # getattr: a traceback may show a client whose __init__ raised.

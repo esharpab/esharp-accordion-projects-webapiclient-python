@@ -50,5 +50,6 @@ else:
 | `CapabilitiesDto.EVENTS` | `"events"` | The [event stream](events.md) works |
 | `CapabilitiesDto.SECURITY_API_KEY` | `"security.apikey"` | The station checks API keys as `security_mode` says ([Security](../security.md)) |
 | `CapabilitiesDto.VALUES_CACHE_ONLY` | `"values.cacheOnly"` | `client.resources.read_cached()` works ([cache-only reads](resources.md#cache-only-reads)); checked by the client itself |
+| `CapabilitiesDto.DOCS` | `"docs"` | The station has its documentation pages: [`client.docs`](docs.md) lists and reads them (firmware 7.1.0) |
 
 The server may list other features too, for example `"instruments"`; `has` takes any string.

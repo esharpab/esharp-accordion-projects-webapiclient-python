@@ -76,6 +76,8 @@ class CapabilitiesDto:
     SECURITY_EXTENSIONS: ClassVar[str] = "security.extensions"
     #: Feature: the factory reset (``client.security.factory_reset()``).
     SECURITY_FACTORY_RESET: ClassVar[str] = "security.factoryreset"
+    #: Feature (firmware 7.1.0): the station has its documentation pages (``client.docs``).
+    DOCS: ClassVar[str] = "docs"
 
     #: The contract version; 0 for a WebApi that predates it.
     api_version: int = 0

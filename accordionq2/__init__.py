@@ -12,6 +12,7 @@ from .capabilities import CapabilitiesDto, NamesCapability
 from .certificates import normalize_sha256, sha256_of
 from .channels import ByteStreamImage, ByteStreamLoadError, ByteStreamStatus
 from .client import AccordionQ2Client
+from .docs import DocsList, DocsPage
 from .drummer import DrummerModuleRef, DrummerTarget
 from .enums import (
     AppTypes,
@@ -137,6 +138,8 @@ __all__ = [
     "ConnectionStatusDto",
     "CreatedApiKey",
     "DirectionTypes",
+    "DocsList",
+    "DocsPage",
     "DrummerModuleRef",
     "DrummerTarget",
     "EventStream",

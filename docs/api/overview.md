@@ -28,6 +28,7 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
     client.firmware          # Firmware releases and updates
     client.audit             # WebApi request audit log
     client.security          # Logins, users, keys, certificate, event log, firewall, extensions, factory reset
+    client.docs              # The station's documentation pages, for scripts and AI agents
 ```
 
 | Group | Description | Details |
@@ -52,3 +53,4 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 | [`firmware`](firmware.md) | List releases, install signed releases, update offline from a package | [→](firmware.md) |
 | [`audit`](audit.md) | WebApi request audit log | [→](audit.md) |
 | [`security`](security.md) | Logins (a Bearer token), users, API keys, the certificate, the security event log, the firewall and SSH keys, extensions, the factory reset (firmware 7.1.0) | [→](security.md) |
+| [`docs`](docs.md) | The station's documentation pages as Markdown or HTML, for scripts and AI agents; needs no API key (firmware 7.1.0) | [→](docs.md) |

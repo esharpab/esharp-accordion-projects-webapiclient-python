@@ -28,6 +28,11 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
   the station and holds no secret) and `recovery_reset_admin(password, user=None)` (`RecoveryReset`; while a recovery
   drive for the station is in it, anyone at the station can set an admin password; sent without the key or the token,
   never over plain HTTP to another host; 409 without a drive). None needs a credential.
+- **`client.docs`** (`DocsGroup`): the station's documentation for scripts and AI agents (firmware 7.1.0,
+  `api/docs`): `list()` (`DocsList`: the pages as `DocsPage` with their path, title, section and summary, `/docs/` on
+  the station's Web UI and its llms.txt; empty with a note on a station without the pages or before 7.1.0) and
+  `get(path, html=False)` (the page's Markdown, or its HTML page). No credential needed. `CapabilitiesDto.DOCS`
+  (`docs`). docs/api/docs.md.
 - `HostSettings.container_ports` and `container_from` (firmware 7.1.0): the TCP ports Docker publishes on the
   station that stay reachable from other hosts in security mode `On`, and from where; every other connection
   forwarded to a container from outside the station is dropped in `On`.

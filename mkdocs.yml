@@ -55,6 +55,7 @@ nav:
       - Firmware: api/firmware.md
       - Audit: api/audit.md
       - Security (logins, users, keys): api/security.md
+      - Documentation (for scripts and AI agents): api/docs.md
   - Models & Enums:
       - Models: reference/models.md
       - Enumerations: reference/enums.md

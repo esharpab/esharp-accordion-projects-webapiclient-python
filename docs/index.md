@@ -54,6 +54,7 @@ with AccordionQ2Client("http://agent64.local:5000") as client:
 - [Files](api/files.md) &mdash; files in the station's folders
 - [Firmware](api/firmware.md) &mdash; signed releases, updates and offline packages
 - [Audit](api/audit.md) &mdash; WebApi request audit log
+- [Documentation](api/docs.md) &mdash; the station's documentation pages as Markdown or HTML, for scripts and AI agents
 
 ## Reference
 
