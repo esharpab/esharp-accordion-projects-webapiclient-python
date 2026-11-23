@@ -738,6 +738,8 @@ class TestHost:
             "sshFrom": ["10.0.0.0/24"],
             "xvcPorts": [2542],
             "xvcFrom": [],
+            "containerPorts": [7000, 7001],
+            "containerFrom": ["192.168.1.0/24"],
         },
         "firewall": {"state": "Applied", "problem": None, "at": "2026-11-23T11:00:00+00:00"},
         "ssh": {"state": "Failed", "problem": "sshd -t failed", "at": None},
@@ -749,7 +751,10 @@ class TestHost:
 
     def test_get(self):
         host = Station((200, self.ANSWER)).security.get_host()
-        assert host.settings == HostSettings(True, ("10.0.0.0/24",), (2542,), ())
+        assert host.settings == HostSettings(
+            True, ("10.0.0.0/24",), (2542,), (), (7000, 7001), ("192.168.1.0/24",)
+        )
+        assert HostSettings.from_dict({"sshAllowed": True}).container_ports == ()
         assert host.firewall.state == "Applied" and host.ssh.problem == "sshd -t failed"
         assert host.tcp_ports == (5001, 443) and host.ssh_keys == 0
         assert host.warnings == ("SSH accepts nobody until a key is installed",)
@@ -757,7 +762,13 @@ class TestHost:
     def test_set(self):
         station = Station((200, self.ANSWER))
         station.security.set_host(
-            HostSettings(ssh_allowed=False, xvc_ports=(2542,), xvc_from=("10.0.0.7",))
+            HostSettings(
+                ssh_allowed=False,
+                xvc_ports=(2542,),
+                xvc_from=("10.0.0.7",),
+                container_ports=(7050, 7051),
+                container_from=("fd00::/8",),
+            )
         )
         assert station.sent()[:3] == (
             "PUT",
@@ -767,6 +778,8 @@ class TestHost:
                 "sshFrom": [],
                 "xvcPorts": [2542],
                 "xvcFrom": ["10.0.0.7"],
+                "containerPorts": [7050, 7051],
+                "containerFrom": ["fd00::/8"],
             },
         )
 

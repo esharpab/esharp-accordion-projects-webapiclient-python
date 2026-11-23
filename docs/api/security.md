@@ -94,7 +94,7 @@ for event in client.security.get_events(tail=20, kinds=["LoginFailed"]).events:
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `get_host()` | `HostSecurity` | `GET /api/security/host`: the settings, the firewall's and SSH's state (`NotApplied`, `Applied`, `Failed`, `Unsupported`), the ports opened in `On`, the number of SSH keys, `warnings` |
-| `set_host(settings)` | `HostSecurity` | `PUT /api/security/host` with a `HostSettings(ssh_allowed, ssh_from, xvc_ports, xvc_from)`: stored in every mode, applied at once in `On` |
+| `set_host(settings)` | `HostSecurity` | `PUT /api/security/host` with a `HostSettings(ssh_allowed, ssh_from, xvc_ports, xvc_from, container_ports, container_from)`: stored in every mode, applied at once in `On`. `container_ports` are the TCP ports Docker publishes that other hosts may reach in `On` (firmware 7.1.0) |
 | `get_ssh_keys()` | `list[SshKey]` | `GET /api/security/ssh-keys`: the `accordion` user's authorized_keys |
 | `add_ssh_key(line)` | `SshKeyChange` | `POST /api/security/ssh-keys`: one authorized_keys line without options; `keys` holds the new key |
 | `remove_ssh_key(key_id)` | `SshKeyChange` | `DELETE /api/security/ssh-keys/{id}`: the keys left, and a warning when that was the last one in `On` |

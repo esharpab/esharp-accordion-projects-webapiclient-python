@@ -470,6 +470,11 @@ class HostSettings:
     #: XVC ports to open (at most 8); empty: closed.
     xvc_ports: tuple[int, ...] = ()
     xvc_from: tuple[str, ...] = ()
+    #: TCP ports Docker publishes on the station (as other hosts connect to them, at most 32)
+    #: that stay reachable from other hosts in ``On``; every other connection forwarded to a
+    #: container from outside is dropped there. Firmware 7.1.0; older firmware ignores them.
+    container_ports: tuple[int, ...] = ()
+    container_from: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -477,6 +482,8 @@ class HostSettings:
             "sshFrom": list(self.ssh_from),
             "xvcPorts": list(self.xvc_ports),
             "xvcFrom": list(self.xvc_from),
+            "containerPorts": list(self.container_ports),
+            "containerFrom": list(self.container_from),
         }
 
     @classmethod
@@ -486,6 +493,8 @@ class HostSettings:
             ssh_from=_strs(d.get("sshFrom")),
             xvc_ports=tuple(int(p) for p in d.get("xvcPorts") or ()),
             xvc_from=_strs(d.get("xvcFrom")),
+            container_ports=tuple(int(p) for p in d.get("containerPorts") or ()),
+            container_from=_strs(d.get("containerFrom")),
         )
 
 
