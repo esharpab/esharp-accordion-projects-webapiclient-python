@@ -989,18 +989,18 @@ class SecurityGroup(ApiGroupBase):
         """Who this client is (a key, a login, or None), the mode, and whether it is claimed."""
         return MeInfo.from_dict(self._obj(self._get_json("api/security/me")))
 
-    def claim(
-        self, setup_code: str, password: str, name: str | None = None, *, use: bool = True
-    ) -> LoginResponse:
-        """Claim an unclaimed station: its first admin user (*name*, default ``admin``) with
-        the setup code read over SSH (``cat ~/webapi/config/setup-code``).
+    def claim(self, password: str, name: str | None = None, *, use: bool = True) -> LoginResponse:
+        """Claim an unclaimed station in security mode ``Off`` or ``Report``: its first admin
+        user (*name*, default ``admin``) with *password*, over HTTPS. No setup code (firmware
+        7.1.0).
 
-        From the station's own network segment, over HTTPS or on the station. The new admin is
-        logged in; with *use* this client sends the token.
+        The new admin is logged in; with *use* this client sends the token. 409 when the
+        station is claimed already, and in mode ``On``: an unclaimed station is claimed there
+        with the recovery drive (:meth:`recovery_reset_admin` while the drive is in it).
         """
-        setup_code, password = _hide(setup_code), _hide(password)
+        password = _hide(password)
         self._session.require_https_or_loopback("Claiming a station")
-        body: dict[str, Any] = {"setupCode": setup_code, "password": password}
+        body: dict[str, Any] = {"password": password}
         if name is not None:
             body["name"] = name
         result = self._login("POST", "api/security/claim", body)
@@ -1047,14 +1047,23 @@ class SecurityGroup(ApiGroupBase):
             "PUT", f"api/security/users/{_q(user_id)}/password", body={"password": password}
         )
 
+    def sign_out_all(self) -> None:
+        """Sign everyone out (Admin): every login token on the station ends at once, also
+        after a restart, this client's own too (it stops sending it). API keys keep working.
+        """
+        self._request("POST", "api/security/sessions/sign-out-all")
+        self._session.set_bearer_token(None)
+
     def set_user_role(self, user_id: str, role: str) -> UserInfo:
-        """Set a user's role; refused (400) when it would leave mode ``On`` without an admin."""
+        """Set a user's role; 409 for the last admin user while the station has no admin
+        API key (every mode)."""
         return UserInfo.from_dict(
             self._obj(self._put_json(f"api/security/users/{_q(user_id)}/role", {"role": str(role)}))
         )
 
     def remove_user(self, user_id: str) -> None:
-        """Remove a user: their logins end at once."""
+        """Remove a user: their logins end at once. 409 for the last admin user while the
+        station has no admin API key (every mode)."""
         self._delete(f"api/security/users/{_q(user_id)}")
 
     # ----- the security event log -----

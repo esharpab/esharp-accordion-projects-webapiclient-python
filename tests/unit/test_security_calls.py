@@ -130,7 +130,7 @@ class TestLogin:
         station = Station(url=url)
         for call in (
             lambda: station.security.login("anna", PASSWORD),
-            lambda: station.security.claim("123456", PASSWORD),
+            lambda: station.security.claim(PASSWORD),
             lambda: station.security.change_password(PASSWORD, PASSWORD + "!"),
             lambda: station.security.create_user("bo", "Viewer", PASSWORD),
             lambda: station.security.set_user_password("9f8e7d6c", PASSWORD),
@@ -279,14 +279,22 @@ class TestLogin:
 
     def test_claim(self):
         station = Station((201, _login()))
-        station.security.claim("482913", PASSWORD, name="root-admin")
+        station.security.claim(PASSWORD, name="root-admin")
         method, path, body, _ = station.sent()
         assert (method, path) == ("POST", "/api/security/claim")
-        assert body == {"setupCode": "482913", "password": PASSWORD, "name": "root-admin"}
+        assert body == {"password": PASSWORD, "name": "root-admin"}  # no setup code since 7.1.0
         assert station.session.has_bearer_token
         default = Station((201, _login()))
-        default.security.claim("482913", PASSWORD)
+        default.security.claim(PASSWORD)
         assert "name" not in default.sent()[2]  # type: ignore[operator]
+
+    def test_sign_out_all_forgets_the_own_token(self):
+        station = Station((204, b""), bearer_token=TOKEN)
+        station.security.sign_out_all()
+        method, path, body, _ = station.sent()
+        assert (method, path) == ("POST", "/api/security/sessions/sign-out-all")
+        assert body is None
+        assert not station.session.has_bearer_token
 
     def test_change_password_uses_the_new_token(self):
         station = Station((200, _login(TOKEN2)), bearer_token=TOKEN)
@@ -387,7 +395,7 @@ class TestBearerToken:
         pem = "-----BEGIN PRIVATE KEY-----SentinelKeyMaterial-----END PRIVATE KEY-----"
         for call in (
             lambda: security.login("anna", PASSWORD),
-            lambda: security.claim("SetupSentinel", PASSWORD),
+            lambda: security.claim(PASSWORD),
             lambda: security.create_user("bo", "Viewer", PASSWORD),
             lambda: security.set_user_password("9f8e7d6c", PASSWORD),
             lambda: security.install_certificate("cert", pem, password=PASSWORD),
@@ -404,7 +412,7 @@ class TestBearerToken:
                 if os.path.dirname(os.path.abspath(f.filename)) == package
             )
             assert PASSWORD not in text
-            assert "SetupSentinel" not in text and "SentinelKeyMaterial" not in text
+            assert "SentinelKeyMaterial" not in text
             assert "<secret>" in text
             assert "<request body with a secret>" in text  # HttpSession.request's frame
 

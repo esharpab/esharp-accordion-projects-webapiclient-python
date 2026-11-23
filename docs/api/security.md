@@ -30,7 +30,8 @@ with AccordionQ2Client("https://station-12:5001", cert_sha256="3F:A2:7C:...:9C")
 | `renew()` | `LoginResponse` | `POST /api/security/token/renew`: a new token for the same login, until 12 hours after it; the client sends the new one. 401 `LOGIN_REFUSED` after that: log in again. `RuntimeError` when the client has no token |
 | `logout()` | &mdash; | `POST /api/security/logout`: this token and every token renewed from the same login stop working. The client stops sending it even when the station can't be reached. A token the station no longer accepts (401: expired, already logged out) is no error, so `logout()` in a `finally` after a long idle doesn't hide the script's own exception |
 | `me()` | `MeInfo` | `GET /api/security/me`: the mode, whether the station is claimed, who this client is (`caller`: a key or a login, or `None`), whether logins work |
-| `claim(setup_code, password, name=None, *, use=True)` | `LoginResponse` | `POST /api/security/claim`: the first admin of an unclaimed station (`name` defaults to `admin` on the station), with the setup code read over SSH (`cat ~/webapi/config/setup-code`), from the station's own network segment |
+| `claim(password, name=None, *, use=True)` | `LoginResponse` | `POST /api/security/claim`: the first admin of an unclaimed station in mode `Off` or `Report` (`name` defaults to `admin` on the station). In `On` 409: an unclaimed station is claimed there with the recovery drive (`recovery_reset_admin`) |
+| `sign_out_all()` | &mdash; | `POST /api/security/sessions/sign-out-all` (Admin): every login token on the station ends, this client's own too; API keys stay |
 | `change_password(current_password, new_password)` | `LoginResponse` | `PUT /api/security/password`: this login's own password (12 to 128 characters). The user's other logins end; the client sends the new token. A wrong current password: 401 `LOGIN_REFUSED`, and the login stays valid |
 
 `LoginResponse` has `token` (never shown by `repr()`), `expires_at` (the station's clock), `expires_in` (seconds from the answer; time the token by this, on your own clock) and `user` (`UserInfo`). A token lasts 15 minutes.
@@ -44,10 +45,10 @@ In `On` the station ends an [event stream](events.md) when the credential it was
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `get_users()` | `list[UserInfo]` | `GET /api/security/users`, never passwords |
-| `create_user(name, role, password)` | `UserInfo` | `POST /api/security/users`. 409 for an admin on an unclaimed station: only the claim, an admin key in `On` or the SSH tool make the first admin |
+| `create_user(name, role, password)` | `UserInfo` | `POST /api/security/users`. 409 for an admin on an unclaimed station: the claim (mode `Off` and `Report`), the recovery drive or an admin key in `On` make the first admin |
 | `set_user_password(user_id, password)` | &mdash; | `PUT /api/security/users/{id}/password`: that user's logins end everywhere |
-| `set_user_role(user_id, role)` | `UserInfo` | `PUT /api/security/users/{id}/role`; 400 when it would leave `On` without an admin |
-| `remove_user(user_id)` | &mdash; | `DELETE /api/security/users/{id}`: their logins end at once |
+| `set_user_role(user_id, role)` | `UserInfo` | `PUT /api/security/users/{id}/role`; 409 for the last admin user while the station has no admin API key (every mode) |
+| `remove_user(user_id)` | &mdash; | `DELETE /api/security/users/{id}`: their logins end at once; 409 for the last admin user while the station has no admin API key |
 
 ## The mode, API keys and the certificate
 

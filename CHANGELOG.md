@@ -27,6 +27,12 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
   the station and holds no secret) and `recovery_reset_admin(password, user=None)` (`RecoveryReset`; while a recovery
   drive for the station is in it, anyone at the station can set an admin password; sent without the key or the token,
   never over plain HTTP to another host; 409 without a drive). None needs a credential.
+- `claim(password, name=None)` takes no setup code (firmware 7.1.0): in security mode Off and Report it makes the
+  first admin of an unclaimed station from any address, over HTTPS; in On the station answers 409, and an unclaimed
+  station is claimed with the recovery drive (`recovery_reset_admin`). `set_user_role` and `remove_user` answer 409
+  for the last admin user while the station has no admin API key, in every mode.
+- `sign_out_all()` (Admin; `POST /api/security/sessions/sign-out-all`): every login token on the station ends, this
+  client's own too (it stops sending it); API keys keep working.
 - **`client.docs`** (`DocsGroup`): the station's documentation for scripts and AI agents (firmware 7.1.0,
   `api/docs`): `list()` (`DocsList`: the pages as `DocsPage` with their path, title, section and summary, `/docs/` on
   the station's Web UI and its llms.txt; empty with a note on a station without the pages or before 7.1.0) and

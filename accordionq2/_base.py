@@ -199,7 +199,7 @@ _T = TypeVar("_T")
 
 
 class _Hidden(_Secret):
-    """A password, setup code or private key as the client holds it: ``repr()`` shows
+    """A password or private key as the client holds it: ``repr()`` shows
     ``'<secret>'``, so a traceback with local variables doesn't show it in the client's frames."""
 
     __slots__ = ()

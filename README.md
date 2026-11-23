@@ -531,7 +531,7 @@ over `http://` to another host.
 
 | Area | Methods |
 |------|---------|
-| Logins | `login(name, password)`, `renew()`, `logout()`, `me()`, `claim(setup_code, password, name=None)`, `change_password(current, new)`, `use_token(token)`, `has_token` |
+| Logins | `login(name, password)`, `renew()`, `logout()`, `me()`, `claim(password, name=None)`, `sign_out_all()`, `change_password(current, new)`, `use_token(token)`, `has_token` |
 | Users | `get_users()`, `create_user(name, role, password)`, `set_user_password(id, password)`, `set_user_role(id, role)`, `remove_user(id)` |
 | Mode, keys, certificate | `get_state()`, `set_mode(mode)`, `create_key(name, role)`, `revoke_key(id)`, `get_certificate()`, `install_certificate(...)`, `remove_certificate()`, `regenerate_certificate(extra_names=None)` |
 | Security event log | `get_events(tail=200, since=None, kinds=None)` |
