@@ -2,8 +2,8 @@
 
 Everything under ``/api/security`` of the WebApi's six security controllers: the mode,
 API keys and the TLS certificate (``SecurityController``), logins, the claim and the users
-(``AccountsController``), the security event log (``SecurityEventsController``), the firewall,
-SSH and the ``accordion`` user's SSH keys (``SecurityHostController``), extensions and module
+(``AccountsController``), the security event log (``SecurityEventsController``), the firewall
+(``SecurityHostController``), extensions and module
 images (``ExtensionsController``) and the factory reset (``FactoryResetController``).
 
 All of it is Admin (in mode ``Off`` that is anyone) except the logins: ``login``, ``me`` and
@@ -454,53 +454,39 @@ class SecurityEvents:
 
 
 # ---------------------------------------------------------------------------
-# The firewall, SSH and SSH keys (SecurityHostController)
+# The firewall (SecurityHostController)
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
 class HostSettings:
-    """The firewall and SSH settings, applied in mode ``On`` only.
+    """The firewall settings, applied in mode ``On`` only.
 
-    A source list holds CIDRs or single addresses, IPv4 and IPv6; empty means any source.
+    A source list holds CIDRs or single addresses, IPv4 and IPv6; empty means any source. In
+    ``On`` the firewall drops connections forwarded to containers from outside the station.
     """
 
-    ssh_allowed: bool = True
-    ssh_from: tuple[str, ...] = ()
     #: XVC ports to open (at most 8); empty: closed.
     xvc_ports: tuple[int, ...] = ()
     xvc_from: tuple[str, ...] = ()
-    #: TCP ports Docker publishes on the station (as other hosts connect to them, at most 32)
-    #: that stay reachable from other hosts in ``On``; every other connection forwarded to a
-    #: container from outside is dropped there. Firmware 7.1.0; older firmware ignores them.
-    container_ports: tuple[int, ...] = ()
-    container_from: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "sshAllowed": self.ssh_allowed,
-            "sshFrom": list(self.ssh_from),
             "xvcPorts": list(self.xvc_ports),
             "xvcFrom": list(self.xvc_from),
-            "containerPorts": list(self.container_ports),
-            "containerFrom": list(self.container_from),
         }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> HostSettings:
         return cls(
-            ssh_allowed=bool(d.get("sshAllowed", True)),
-            ssh_from=_strs(d.get("sshFrom")),
             xvc_ports=tuple(int(p) for p in d.get("xvcPorts") or ()),
             xvc_from=_strs(d.get("xvcFrom")),
-            container_ports=tuple(int(p) for p in d.get("containerPorts") or ()),
-            container_from=_strs(d.get("containerFrom")),
         )
 
 
 @dataclass(frozen=True, slots=True)
 class HostPart:
-    """The firewall's or SSH's state and when it was last reconciled."""
+    """The firewall's or the service access's state and when it was last reconciled."""
 
     #: ``NotApplied``, ``Applied``, ``Failed`` or ``Unsupported`` (not on a station).
     state: str
@@ -519,17 +505,17 @@ class HostPart:
 
 @dataclass(frozen=True, slots=True)
 class HostSecurity:
-    """The firewall and SSH: settings, what is in effect, ports, SSH keys and warnings."""
+    """The firewall: settings, what is in effect, ports and warnings."""
 
     settings: HostSettings
     firewall: HostPart
+    #: E-Sharp's service access (SSH), keys only in ``On``.
     ssh: HostPart
     #: The TCP ports the firewall opens in ``On``.
     tcp_ports: tuple[int, ...]
+    #: The service access's port.
     ssh_port: int
-    #: How many SSH keys are installed.
-    ssh_keys: int
-    #: E.g. "SSH accepts nobody until a key is installed"; None for none.
+    #: E.g. "The firewall isn't loaded: ..."; None for none.
     warnings: tuple[str, ...] | None
 
     @classmethod
@@ -540,41 +526,8 @@ class HostSecurity:
             ssh=HostPart.from_dict(_dict(d.get("ssh"))),
             tcp_ports=tuple(int(p) for p in d.get("tcpPorts") or ()),
             ssh_port=int(d.get("sshPort", 0)),
-            ssh_keys=int(d.get("sshKeys", 0)),
             warnings=_opt_strs(d.get("warnings")),
         )
-
-
-@dataclass(frozen=True, slots=True)
-class SshKey:
-    """One line of the ``accordion`` user's authorized_keys."""
-
-    id: str
-    fingerprint: str
-    #: E.g. ``ssh-ed25519``; ``unreadable`` for a line that can't be read.
-    type: str
-    bits: int
-    comment: str
-    has_options: bool
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> SshKey:
-        return cls(
-            id=str(d.get("id", "")),
-            fingerprint=str(d.get("fingerprint", "")),
-            type=str(d.get("type", "")),
-            bits=int(d.get("bits", 0)),
-            comment=str(d.get("comment", "")),
-            has_options=bool(d.get("hasOptions")),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class SshKeyChange:
-    """An SSH key added (:attr:`keys` holds it alone) or the keys left after a removal."""
-
-    keys: tuple[SshKey, ...]
-    warnings: tuple[str, ...] | None
 
 
 # ---------------------------------------------------------------------------
@@ -832,7 +785,7 @@ _NO_CREDENTIALS: dict[str, str] = {API_KEY_HEADER: None, "Authorization": None} 
 
 class SecurityGroup(ApiGroupBase):
     """The station's security: logins, users, keys, the certificate, the event log, the
-    firewall and SSH, extensions and the factory reset (firmware 7.1.0).
+    firewall, extensions and the factory reset (firmware 7.1.0).
 
     A person logs in, and the client sends the token from then on::
 
@@ -1123,39 +1076,16 @@ class SecurityGroup(ApiGroupBase):
             self._obj(self._get_json(f"api/security/events?{urlencode(query)}"))
         )
 
-    # ----- the firewall, SSH and SSH keys -----
+    # ----- the firewall -----
 
     def get_host(self) -> HostSecurity:
-        """The firewall and SSH settings, whether they are in effect, ports and warnings."""
+        """The firewall settings (the XVC ports), whether they are in effect, ports and warnings."""
         return HostSecurity.from_dict(self._obj(self._get_json("api/security/host")))
 
     def set_host(self, settings: HostSettings) -> HostSecurity:
-        """Set the firewall and SSH settings: stored in every mode, applied at once in ``On``."""
+        """Set the firewall settings (the XVC ports): stored in every mode, applied in ``On``."""
         return HostSecurity.from_dict(
             self._obj(self._put_json("api/security/host", settings.to_dict()))
-        )
-
-    def get_ssh_keys(self) -> list[SshKey]:
-        """The ``accordion`` user's SSH keys (authorized_keys)."""
-        return [SshKey.from_dict(k) for k in self._list(self._get_json("api/security/ssh-keys"))]
-
-    def add_ssh_key(self, line: str) -> SshKeyChange:
-        """Install an SSH key for the ``accordion`` user: one authorized_keys line without
-        options (Ed25519, ECDSA, the FIDO kinds, or RSA of 3072 bits or more).
-
-        :attr:`SshKeyChange.keys` holds the new key alone. In ``On`` that is how SSH lets
-        anyone in, and the key's holder gets a shell on the station.
-        """
-        d = self._obj(self._post_json("api/security/ssh-keys", {"key": line}))
-        return SshKeyChange((SshKey.from_dict(_dict(d.get("info"))),), _opt_strs(d.get("warnings")))
-
-    def remove_ssh_key(self, key_id: str) -> SshKeyChange:
-        """Remove an SSH key by its id; the keys left, and a warning when that was the last
-        one in ``On``."""
-        raw = self._request("DELETE", f"api/security/ssh-keys/{_q(key_id)}")
-        d = self._obj(json.loads(raw))
-        return SshKeyChange(
-            tuple(SshKey.from_dict(k) for k in d.get("keys") or ()), _opt_strs(d.get("warnings"))
         )
 
     # ----- extensions and module images -----

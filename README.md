@@ -535,7 +535,7 @@ over `http://` to another host.
 | Users | `get_users()`, `create_user(name, role, password)`, `set_user_password(id, password)`, `set_user_role(id, role)`, `remove_user(id)` |
 | Mode, keys, certificate | `get_state()`, `set_mode(mode)`, `create_key(name, role)`, `revoke_key(id)`, `get_certificate()`, `install_certificate(...)`, `remove_certificate()`, `regenerate_certificate(extra_names=None)` |
 | Security event log | `get_events(tail=200, since=None, kinds=None)` |
-| Firewall and SSH | `get_host()`, `set_host(HostSettings(...))`, `get_ssh_keys()`, `add_ssh_key(line)`, `remove_ssh_key(id)` |
+| Firewall | `get_host()`, `set_host(HostSettings(...))` |
 | Extensions | `get_extensions()`, `accept_extension(folder, digest)`, `withdraw_extension(folder)`, `set_extension_uploads(minutes)`, `set_module_image_role(role)` |
 | Factory reset | `factory_reset_preview()`, `factory_reset(confirm, erase_calibration=False)`, `last_factory_reset()` |
 

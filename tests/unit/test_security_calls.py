@@ -536,10 +536,10 @@ class TestModeKeysCertificate:
         assert state.throttled is None and state.users == () and state.module_image_role == "Admin"
 
     def test_set_mode(self):
-        station = Station((200, {"mode": "On", "keys": [], "warnings": ["SSH accepts nobody"]}))
+        station = Station((200, {"mode": "On", "keys": [], "warnings": ["Firewall not loaded"]}))
         state = station.security.set_mode(SecurityMode.ON)
         assert station.sent()[:3] == ("PUT", "/api/security/mode", {"mode": "On"})
-        assert state.warnings == ("SSH accepts nobody",)
+        assert state.warnings == ("Firewall not loaded",)
 
     def test_create_key_never_shows_the_key_in_a_repr(self):
         station = Station(
@@ -718,89 +718,43 @@ class TestEvents:
 
 
 # ---------------------------------------------------------------------------
-# The firewall, SSH and SSH keys
+# The firewall
 # ---------------------------------------------------------------------------
-
-
-SSH_KEY = {
-    "id": "k1",
-    "fingerprint": "SHA256:abc",
-    "type": "ssh-ed25519",
-    "bits": 256,
-    "comment": "anna@pc",
-    "hasOptions": False,
-}
 
 
 class TestHost:
     ANSWER: ClassVar[dict[str, Any]] = {
-        "settings": {
-            "sshAllowed": True,
-            "sshFrom": ["10.0.0.0/24"],
-            "xvcPorts": [2542],
-            "xvcFrom": [],
-            "containerPorts": [7000, 7001],
-            "containerFrom": ["192.168.1.0/24"],
-        },
+        "settings": {"xvcPorts": [2542], "xvcFrom": []},
         "firewall": {"state": "Applied", "problem": None, "at": "2026-11-23T11:00:00+00:00"},
         "ssh": {"state": "Failed", "problem": "sshd -t failed", "at": None},
         "tcpPorts": [5001, 443],
         "sshPort": 22,
-        "sshKeys": 0,
-        "warnings": ["SSH accepts nobody until a key is installed"],
+        "warnings": ["The firewall isn't loaded: x"],
     }
 
     def test_get(self):
         host = Station((200, self.ANSWER)).security.get_host()
-        assert host.settings == HostSettings(
-            True, ("10.0.0.0/24",), (2542,), (), (7000, 7001), ("192.168.1.0/24",)
-        )
-        assert HostSettings.from_dict({"sshAllowed": True}).container_ports == ()
+        assert host.settings == HostSettings((2542,), ())
+        # An earlier 7.1.0 beta's members are read past
+        old = {"sshAllowed": False, "containerPorts": [7000]}
+        assert HostSettings.from_dict(old) == HostSettings()
         assert host.firewall.state == "Applied" and host.ssh.problem == "sshd -t failed"
-        assert host.tcp_ports == (5001, 443) and host.ssh_keys == 0
-        assert host.warnings == ("SSH accepts nobody until a key is installed",)
+        assert host.tcp_ports == (5001, 443) and host.ssh_port == 22
+        assert host.warnings == ("The firewall isn't loaded: x",)
 
     def test_set(self):
         station = Station((200, self.ANSWER))
-        station.security.set_host(
-            HostSettings(
-                ssh_allowed=False,
-                xvc_ports=(2542,),
-                xvc_from=("10.0.0.7",),
-                container_ports=(7050, 7051),
-                container_from=("fd00::/8",),
-            )
-        )
+        station.security.set_host(HostSettings(xvc_ports=(2542,), xvc_from=("10.0.0.7",)))
         assert station.sent()[:3] == (
             "PUT",
             "/api/security/host",
-            {
-                "sshAllowed": False,
-                "sshFrom": [],
-                "xvcPorts": [2542],
-                "xvcFrom": ["10.0.0.7"],
-                "containerPorts": [7050, 7051],
-                "containerFrom": ["fd00::/8"],
-            },
+            {"xvcPorts": [2542], "xvcFrom": ["10.0.0.7"]},
         )
 
-    def test_ssh_keys(self):
-        station = Station(
-            (200, [SSH_KEY]),
-            (201, {"info": SSH_KEY, "warnings": None}),
-            (200, {"keys": [], "warnings": ["SSH accepts nobody until a key is installed"]}),
-        )
-        assert station.security.get_ssh_keys()[0].fingerprint == "SHA256:abc"
-        added = station.security.add_ssh_key("ssh-ed25519 AAAAC3Nz anna@pc")
-        assert station.sent()[:3] == (
-            "POST",
-            "/api/security/ssh-keys",
-            {"key": "ssh-ed25519 AAAAC3Nz anna@pc"},
-        )
-        assert added.keys[0].id == "k1" and added.warnings is None
-        left = station.security.remove_ssh_key("k1")
-        assert station.sent()[:2] == ("DELETE", "/api/security/ssh-keys/k1")
-        assert left.keys == () and left.warnings == ("SSH accepts nobody until a key is installed",)
+    def test_no_ssh_key_calls(self):
+        # SSH is E-Sharp's service access: the client has no SSH key calls
+        for name in ("get_ssh_keys", "add_ssh_key", "remove_ssh_key"):
+            assert not hasattr(Station((200, {})).security, name)
 
 
 # ---------------------------------------------------------------------------

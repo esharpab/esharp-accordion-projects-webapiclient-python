@@ -16,11 +16,10 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
   `claim`, `change_password`, `use_token`, `has_token`), users (`get_users`, `create_user`, `set_user_password`,
   `set_user_role`, `remove_user`), the mode, API keys and the certificate (`get_state`, `set_mode`, `create_key`,
   `revoke_key`, `get_certificate`, `install_certificate`, `remove_certificate`, `regenerate_certificate`), the
-  security event log (`get_events`), the firewall, SSH and SSH keys (`get_host`, `set_host`, `get_ssh_keys`,
-  `add_ssh_key`, `remove_ssh_key`), extensions (`get_extensions`, `accept_extension`, `withdraw_extension`,
+  security event log (`get_events`), the firewall (`get_host`, `set_host`: the XVC ports), extensions (`get_extensions`, `accept_extension`, `withdraw_extension`,
   `set_extension_uploads`, `set_module_image_role`) and the factory reset (`factory_reset_preview`, `factory_reset`,
   `last_factory_reset`), with their models (`LoginResponse`, `UserInfo`, `MeInfo`, `SecurityState`, `CertificateInfo`,
-  `SecurityEvents`, `HostSecurity`, `HostSettings`, `SshKey`, `ExtensionsReport`, `FactoryResetPreview`, ...) and
+  `SecurityEvents`, `HostSecurity`, `HostSettings`, `ExtensionsReport`, `FactoryResetPreview`, ...) and
   `SecurityMode`, `StationRole`. docs/api/security.md.
 - **The recovery drive** (firmware 7.1.0), for a station whose admin password is lost: `get_recovery()`
   (`RecoveryWindow`: whether the recovery window is open, until when, whether the USB ports are off; `None` before
@@ -33,9 +32,6 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
   the station's Web UI and its llms.txt; empty with a note on a station without the pages or before 7.1.0) and
   `get(path, html=False)` (the page's Markdown, or its HTML page). No credential needed. `CapabilitiesDto.DOCS`
   (`docs`). docs/api/docs.md.
-- `HostSettings.container_ports` and `container_from` (firmware 7.1.0): the TCP ports Docker publishes on the
-  station that stay reachable from other hosts in security mode `On`, and from where; every other connection
-  forwarded to a container from outside the station is dropped in `On`.
 - **The station's certificate request** (firmware 7.1.0, FW7 CERT-01), for a site CA without a private key leaving
   the station: `request_certificate(names=None)` (a key made on the station and its CSR, `CertificateRequest`),
   `get_certificate_request()` (`None` when none is pending), `delete_certificate_request()` and
