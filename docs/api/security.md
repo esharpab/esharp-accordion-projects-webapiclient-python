@@ -57,10 +57,26 @@ In `On` the station ends an [event stream](events.md) when the credential it was
 | `set_mode(mode)` | `SecurityState` | `PUT /api/security/mode`: `Off`, `Report` or `On`; `warnings` lists what to check. `On` needs an admin key or login, HTTPS on the station, and this request over HTTPS or on the station |
 | `create_key(name, role)` | `CreatedApiKey` | `POST /api/security/keys`: `key` is shown this once only (never by `repr()`); `warnings` when it was issued over plain HTTP |
 | `revoke_key(key_id)` | &mdash; | `DELETE /api/security/keys/{id}` |
-| `get_certificate()` | `CertificateInfo` | `GET /api/security/certificate`: `sha256` is what `cert_sha256` pins |
+| `get_certificate()` | `CertificateInfo` | `GET /api/security/certificate`: `sha256` is what `cert_sha256` pins; `warnings` when it has expired or expires within 30 days (firmware 7.1.0); `default_request_names` |
 | `install_certificate(certificate_pem=None, private_key_pem=None, *, pfx=None, password=None)` | `CertificateInfo` | `PUT /api/security/certificate`: PEM (leaf and intermediates, and the key) or PKCS#12 bytes. Open TLS connections are closed: give pinned clients the new fingerprint |
 | `remove_certificate()` | `CertificateInfo` | `DELETE /api/security/certificate`: the self-signed one serves again |
 | `regenerate_certificate(extra_names=None)` | `CertificateInfo` | `POST /api/security/certificate/regenerate`: a new self-signed certificate, a new fingerprint |
+| `request_certificate(names=None)` | `CertificateRequest` | `POST /api/security/certificate/request` (firmware 7.1.0): a new key made on the station, which never leaves it, and the CSR for your CA (`csr_pem`); no names: the station's `default_request_names`. It replaces a pending request |
+| `get_certificate_request()` | `CertificateRequest` or `None` | `GET /api/security/certificate/request`: the pending request (names, `created`, `csr_pem`; never the key); `None` when none is pending |
+| `delete_certificate_request()` | &mdash; | `DELETE /api/security/certificate/request`: the pending request and its key are deleted |
+| `install_signed_certificate(certificate_pem)` | `CertificateInfo` | `PUT /api/security/certificate` with the certificate the CA signed for the pending request (leaf and intermediates, PEM) and no key: it serves as the site certificate and the request is used up; 400 when it isn't the pending request's |
+
+Your own CA without a private key leaving the station:
+
+```python
+request = client.security.request_certificate()          # the station's default names
+open("station-12.csr", "w").write(request.csr_pem)        # give it to the CA
+# ... the CA issues station-12.cer (PEM, with its chain)
+installed = client.security.install_signed_certificate(open("station-12.cer").read())
+print(installed.sha256)
+```
+
+The certificate calls need HTTPS or the station itself: over plain HTTP from another host the station answers 400.
 
 ## The security event log
 

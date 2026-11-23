@@ -331,7 +331,12 @@ class CertificateInfo:
     certificate_pem: str
     #: Install, remove, regenerate: the open TLS connections the change closed.
     open_connections_closed: int | None = None
+    #: A change's warnings; from :meth:`SecurityGroup.get_certificate` (firmware 7.1.0): an
+    #: expired certificate, or one that expires within 30 days, with the date.
     warnings: tuple[str, ...] | None = None
+    #: The names :meth:`SecurityGroup.request_certificate` uses when given none (firmware
+    #: 7.1.0); None from older firmware.
+    default_request_names: tuple[str, ...] | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> CertificateInfo:
@@ -353,6 +358,40 @@ class CertificateInfo:
             cloned=cloned if isinstance(cloned, dict) else None,
             certificate_pem=str(d.get("certificatePem", "")),
             open_connections_closed=int(closed) if isinstance(closed, int) else None,
+            warnings=_opt_strs(d.get("warnings")),
+            default_request_names=_opt_strs(d.get("defaultRequestNames")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CertificateRequest:
+    """A certificate request made on the station (firmware 7.1.0): never its key.
+
+    :attr:`csr_pem` is what the site's CA signs; the key stays on the station until the
+    signed certificate is installed with :meth:`SecurityGroup.install_signed_certificate`.
+    """
+
+    #: DNS names and IP addresses; the first is the subject's common name.
+    names: tuple[str, ...]
+    created: str
+    created_by: str | None
+    csr_pem: str
+    #: SHA-256 over the request's public key (SubjectPublicKeyInfo), hex pairs with colons.
+    public_key_sha256: str
+    #: When made: whether it replaced a pending request, whose key is then gone.
+    replaced: bool | None = None
+    warnings: tuple[str, ...] | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> CertificateRequest:
+        replaced = d.get("replaced")
+        return cls(
+            names=_strs(d.get("names")),
+            created=str(d.get("created", "")),
+            created_by=_opt_str(d.get("createdBy")),
+            csr_pem=str(d.get("csrPem", "")),
+            public_key_sha256=str(d.get("publicKeySha256", "")),
+            replaced=replaced if isinstance(replaced, bool) else None,
             warnings=_opt_strs(d.get("warnings")),
         )
 
@@ -819,6 +858,55 @@ class SecurityGroup(ApiGroupBase):
         body = None if extra_names is None else {"extraNames": list(extra_names)}
         return CertificateInfo.from_dict(
             self._obj(self._post_json("api/security/certificate/regenerate", body))
+        )
+
+    # ----- the certificate request (firmware 7.1.0, FW7 CERT-01) -----
+
+    def request_certificate(self, names: list[str] | None = None) -> CertificateRequest:
+        """Make a certificate request on the station: a new key pair whose private key never
+        leaves it, and the CSR (:attr:`CertificateRequest.csr_pem`) for the site's CA.
+
+        *names* are DNS names or IP addresses, the first the subject's common name (at most
+        32, no wildcards); None: the station's default names
+        (:attr:`CertificateInfo.default_request_names`). It replaces a pending request, whose
+        key is then deleted. Over HTTPS or on the station (400 over plain HTTP from another
+        host: no secret is sent, but the station keeps one rule for certificate changes).
+        """
+        body = None if names is None else {"names": list(names)}
+        return CertificateRequest.from_dict(
+            self._obj(self._post_json("api/security/certificate/request", body))
+        )
+
+    def get_certificate_request(self) -> CertificateRequest | None:
+        """The pending certificate request (never its key); None when none is pending (404)."""
+        try:
+            d = self._get_json("api/security/certificate/request")
+        except AccordionQ2ApiError as error:
+            if error.status_code == 404:
+                return None
+            raise
+        return CertificateRequest.from_dict(self._obj(d))
+
+    def delete_certificate_request(self) -> None:
+        """Discard the pending request: its key is deleted, so a certificate signed for it no
+        longer installs (404 when none is pending)."""
+        self._delete("api/security/certificate/request")
+
+    def install_signed_certificate(self, certificate_pem: str) -> CertificateInfo:
+        """Install the certificate the CA signed for the pending request: the leaf and its
+        intermediates as PEM, no key (the key is the request's, on the station).
+
+        It serves as the site certificate (the same checks and warnings as
+        :meth:`install_certificate`; open TLS connections are closed) and the request is used
+        up. 400 when no request is pending or the certificate's public key isn't the
+        request's, and over plain HTTP from another host.
+        """
+        if not certificate_pem or not certificate_pem.strip():
+            raise ValueError("The signed certificate (PEM) is empty")
+        return CertificateInfo.from_dict(
+            self._obj(
+                self._put_json("api/security/certificate", {"certificatePem": certificate_pem})
+            )
         )
 
     # ----- logins -----

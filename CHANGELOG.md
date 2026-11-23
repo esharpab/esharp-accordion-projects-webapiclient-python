@@ -22,6 +22,12 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
   `last_factory_reset`), with their models (`LoginResponse`, `UserInfo`, `MeInfo`, `SecurityState`, `CertificateInfo`,
   `SecurityEvents`, `HostSecurity`, `HostSettings`, `SshKey`, `ExtensionsReport`, `FactoryResetPreview`, ...) and
   `SecurityMode`, `StationRole`. docs/api/security.md.
+- **The station's certificate request** (firmware 7.1.0, FW7 CERT-01), for a site CA without a private key leaving
+  the station: `request_certificate(names=None)` (a key made on the station and its CSR, `CertificateRequest`),
+  `get_certificate_request()` (`None` when none is pending), `delete_certificate_request()` and
+  `install_signed_certificate(certificate_pem)` (the signed certificate and its chain, no key).
+  `CertificateInfo.default_request_names`; on a GET, `CertificateInfo.warnings` names an expired certificate or one
+  that expires within 30 days.
 - **Bearer tokens**: `bearer_token=` on `AccordionQ2Client`; `login`, `claim`, `renew` and `change_password` set the
   client's token, `logout` clears it. The token is protected like the API key (`repr()` shows `bearer_token=set`, a
   traceback with locals `'<login token>'`, server text repeating it withheld) and replaces an `Authorization` from

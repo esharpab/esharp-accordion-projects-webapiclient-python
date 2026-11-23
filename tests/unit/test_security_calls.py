@@ -603,6 +603,69 @@ class TestModeKeysCertificate:
         station.security.regenerate_certificate(["station-12.lab", "10.0.0.5"])
         assert station.sent()[2] == {"extraNames": ["station-12.lab", "10.0.0.5"]}
 
+    def test_expiry_warning_and_default_request_names(self):
+        cert = Station(
+            (
+                200,
+                {
+                    **CERT,
+                    "warnings": ["expires 2026-12-01"],
+                    "defaultRequestNames": ["A004166", "A004166.local"],
+                },
+            )
+        ).security.get_certificate()
+        assert cert.warnings == ("expires 2026-12-01",)
+        assert cert.default_request_names == ("A004166", "A004166.local")
+        assert Station((200, CERT)).security.get_certificate().default_request_names is None
+
+    def test_certificate_request(self):
+        made = {
+            "names": ["A004166", "10.0.0.5"],
+            "created": "2026-11-23T10:00:00+00:00",
+            "createdBy": "user 1 'admin'",
+            "csrPem": "-----BEGIN CERTIFICATE REQUEST-----",
+            "publicKeySha256": "8C:1D",
+            "replaced": True,
+            "warnings": ["It replaced the pending request"],
+        }
+        station = Station(
+            (200, made),
+            (200, {**made, "replaced": None, "warnings": None}),
+            (200, made),
+            (404, {"error": "No certificate request is pending", "requires": "Admin"}),
+            (204, b""),
+        )
+        request = station.security.request_certificate(["A004166", "10.0.0.5"])
+        assert station.sent()[:3] == (
+            "POST",
+            "/api/security/certificate/request",
+            {"names": ["A004166", "10.0.0.5"]},
+        )
+        assert request.names == ("A004166", "10.0.0.5") and request.replaced is True
+        assert request.csr_pem.startswith("-----BEGIN CERTIFICATE REQUEST-----")
+        assert request.public_key_sha256 == "8C:1D" and request.created_by == "user 1 'admin'"
+        request = station.security.request_certificate()
+        assert station.sent()[:3] == ("POST", "/api/security/certificate/request", None)
+        assert request.replaced is None and request.warnings is None
+        pending = station.security.get_certificate_request()
+        assert station.sent()[:2] == ("GET", "/api/security/certificate/request")
+        assert pending is not None and pending.names[0] == "A004166"
+        assert station.security.get_certificate_request() is None
+        station.security.delete_certificate_request()
+        assert station.sent()[:2] == ("DELETE", "/api/security/certificate/request")
+
+    def test_install_signed_certificate(self):
+        station = Station((200, {**CERT, "source": "Site", "openConnectionsClosed": 1}))
+        cert = station.security.install_signed_certificate("LEAF+CHAIN")
+        assert station.sent()[:3] == (
+            "PUT",
+            "/api/security/certificate",
+            {"certificatePem": "LEAF+CHAIN"},
+        )
+        assert cert.source == "Site"
+        with pytest.raises(ValueError):
+            station.security.install_signed_certificate("  ")
+
 
 # ---------------------------------------------------------------------------
 # The security event log
