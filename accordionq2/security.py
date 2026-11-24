@@ -21,7 +21,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import secrets
+import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -746,6 +748,10 @@ class RecoveryWindow:
     #: Why the window is closed: ``None`` (open), ``NoDrive``, ``Expired``, ``DriveGone``, ``Used``,
     #: ``Invalid``, ``Outdated`` (made by an earlier firmware), ``ClockBehind``.
     why: str | None = None
+    #: The station's clock (ISO 8601, UTC) when it answered: a drive's time is judged by it. When
+    #: this computer's clock differs by more than an hour, pass it to
+    #: :meth:`SecurityGroup.make_recovery_drive` as *now*.
+    now: str | None = None
 
     @property
     def is_open(self) -> bool:
@@ -762,6 +768,7 @@ class RecoveryWindow:
             station=_opt_str(d.get("station")),
             created=_opt_str(d.get("created")),
             why=_opt_str(d.get("why")),
+            now=_opt_str(d.get("now")),
         )
 
 
@@ -805,8 +812,11 @@ def recovery_drive_hash(secret: bytes, station: str, created: str) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def format_recovery_created(at: datetime) -> str:
-    """A time as the recovery drive's file carries it: ``YYYY-MM-DDTHH:MM:SSZ`` (UTC)."""
+def format_recovery_created(at: datetime | str) -> str:
+    """A time as the recovery drive's file carries it: ``YYYY-MM-DDTHH:MM:SSZ`` (UTC). A string is
+    read as ISO 8601 (such as :attr:`RecoveryWindow.now`)."""
+    if isinstance(at, str):
+        at = datetime.fromisoformat(at)
     if at.tzinfo is None:
         at = at.replace(tzinfo=UTC)
     return at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -855,8 +865,17 @@ class RecoveryDriveKey:
         return cls(station=d["station"], created=d["created"], secret=secret.lower())
 
     def save(self, path: str | Path) -> None:
-        """Write the key to *path* (the caller chooses where: it holds the secret)."""
-        Path(path).write_text(self.to_json() + "\n", encoding="utf-8")
+        """Write the key to *path* (the caller chooses where: it holds the secret).
+
+        On Linux and macOS the file is readable by its owner only (0600), also when it was there
+        already; on Windows it gets the folder's permissions, so choose a folder only you can read.
+        """
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0)
+        fd = os.open(path, flags, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as file:
+            if sys.platform != "win32":
+                os.fchmod(file.fileno(), 0o600)  # a file that was there keeps its mode otherwise
+            file.write(self.to_json() + "\n")
 
     @classmethod
     def load(cls, path: str | Path) -> RecoveryDriveKey:
@@ -865,7 +884,7 @@ class RecoveryDriveKey:
 
 
 def make_recovery_drive_file(
-    station: str, now: datetime | None = None
+    station: str, now: datetime | str | None = None
 ) -> tuple[bytes, RecoveryDriveKey]:
     """A new recovery drive for *station* made at *now* (default: this computer's clock): the
     bytes of ``accordion-recovery.json`` (kind, station, created, hash; never the secret) and the
@@ -1300,7 +1319,7 @@ class SecurityGroup(ApiGroupBase):
     def recovery_key(self, key: RecoveryDriveKey | None) -> None:
         self._recovery_key = key
 
-    def make_recovery_drive(self, station: str, now: datetime | None = None) -> bytes:
+    def make_recovery_drive(self, station: str, now: datetime | str | None = None) -> bytes:
         """Make a recovery drive for *station* here, without the station.
 
         *station* is the station's name (its serial number; :meth:`get_recovery` answers it as
@@ -1309,7 +1328,8 @@ class SecurityGroup(ApiGroupBase):
         :attr:`recovery_key` (save it with :meth:`save_recovery_key` to reset from another
         process); the file holds a hash, never the secret. A drive opens the station's recovery
         window until 24 hours after it was made (this computer's clock; at most an hour ahead of
-        the station's).
+        the station's). When this computer's clock and the station's differ by more than an hour,
+        pass the station's, :attr:`RecoveryWindow.now`, as *now*.
         """
         data, key = make_recovery_drive_file(station, now)
         self.recovery_key = key

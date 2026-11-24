@@ -24,11 +24,13 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
 - **The recovery drive** (firmware 7.1.0), for a station whose admin password is lost. The client makes the drive,
   not the station: `make_recovery_drive(station)` returns the bytes of `accordion-recovery.json` (`kind`, `station`,
   `created`, `hash`; never the secret) and keeps the drive's random secret in `recovery_key` (`RecoveryDriveKey`),
-  which `save_recovery_key(path)` and `load_recovery_key(path)` write and read in a file the caller chooses.
+  which `save_recovery_key(path)` and `load_recovery_key(path)` write and read in a file the caller chooses (on Linux
+  and macOS readable by its owner only, 0600).
   `recovery_drive_hash` is the hash's encoding (SHA-256 of the secret, 0x00, the station's name in upper case, 0x00,
   `created`), the same as the station's, the Web UI's and the .NET client's. `get_recovery()` (`RecoveryWindow`:
   whether the recovery window is open, until when, whether the USB ports are off, the station's name, when the drive
-  in it was made and why the window is closed; `None` before 7.1.0) and `recovery_reset_admin(password, user=None)`
+  in it was made, why the window is closed and `now`, the station's clock, which `make_recovery_drive(station, now)`
+  takes when this computer's clock is off by more than an hour; `None` before 7.1.0) and `recovery_reset_admin(password, user=None)`
   (`RecoveryReset`; sends the secret of `recovery_key`, without the key or the token, never over plain HTTP to another
   host; `ValueError` without a key; 409 without a drive, 403 for a drive made by another client or browser). None
   needs a credential.

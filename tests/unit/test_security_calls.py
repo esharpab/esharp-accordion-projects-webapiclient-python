@@ -1045,6 +1045,49 @@ class TestRecoveryDrive:
         station.security.make_recovery_drive("A002531")
         assert station.security.recovery_key.secret != key.secret  # a new drive, a new secret
 
+    @pytest.mark.skipif(
+        os.name == "nt", reason="Windows: the key file gets its folder's permissions"
+    )
+    def test_the_key_file_is_readable_by_its_owner_only(self, tmp_path):
+        path = tmp_path / "key.json"
+        path.write_text("old", encoding="utf-8")
+        path.chmod(0o644)  # a file that was there, readable by everyone
+        station = Station()
+        station.security.make_recovery_drive("A002531")
+        station.security.save_recovery_key(path)
+        assert path.stat().st_mode & 0o777 == 0o600
+        assert Station().security.load_recovery_key(path) == station.security.recovery_key
+        fresh = tmp_path / "fresh.json"
+        station.security.save_recovery_key(fresh)
+        assert fresh.stat().st_mode & 0o777 == 0o600
+
+    def test_the_key_file_is_one_line_of_json(self, tmp_path):
+        station = Station()
+        station.security.make_recovery_drive("A002531")
+        station.security.save_recovery_key(tmp_path / "key.json")
+        data = (tmp_path / "key.json").read_bytes()
+        assert data.endswith(b"}\n") and b"\r" not in data
+
+    def test_the_drive_can_be_made_at_the_stations_time(self):
+        station = Station(
+            (
+                200,
+                {
+                    "window": "closed",
+                    "hint": "",
+                    "steps": [],
+                    "station": "A002531",
+                    "why": "ClockBehind",
+                    "now": "2026-11-21T08:00:00+00:00",
+                },
+            )
+        )
+        window = station.security.get_recovery()
+        assert window is not None and window.now == "2026-11-21T08:00:00+00:00"
+        data = station.security.make_recovery_drive(window.station, window.now)
+        assert json.loads(data)["created"] == "2026-11-21T08:00:00Z"
+        assert station.security.recovery_key.created == "2026-11-21T08:00:00Z"
+
     def test_the_reset_goes_without_the_key_and_the_token_and_doesnt_log_in(self):
         answer = {
             "user": {**USER, "name": "admin", "role": "Admin"},
