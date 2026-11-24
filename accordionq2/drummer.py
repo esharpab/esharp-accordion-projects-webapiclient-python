@@ -156,23 +156,24 @@ class DrummerTarget:
         """
         self.write("Target.Port", (port or "").strip())
 
-    # -- the package library and build identity (the firmware's Drummer/PACKAGES.md) -----------------
+    # -- the package library and build identity (the firmware's Drummer/PACKAGES.md) ----------
     def library(self) -> dict[str, Any]:
-        """``Target.Library``: the station's package library and this instance's selection, from the
-        module's memory (no scan): ``dir``, ``bytes``, ``free_bytes``, ``floor_bytes``, ``selection``
-        (``source`` "library", "PackagePath" or "none") and ``packages``, newest upload first.
+        """``Target.Library``: the station's package library and this instance's selection, from
+        the module's memory (no scan): ``dir``, ``bytes``, ``free_bytes``, ``floor_bytes``,
+        ``selection`` (``source`` "library", "PackagePath" or "none") and ``packages``, newest
+        upload first.
 
         404 on firmware without the library.
         """
         return self._object("Target.Library")
 
     def select_package(self, sha256: str) -> None:
-        """Select a library package for this instance (``Target.Select``, Operator): its SHA-256 or 8
-        or more of its first hex digits.
+        """Select a library package for this instance (``Target.Select``, Operator): its SHA-256 or
+        8 or more of its first hex digits.
 
         Kept across restarts. The design's channels are built again, and under the module's
-        ``LoadOnSelect`` (default ``mismatch``) its bitfile is loaded when the FPGA does not run that
-        build or the station can't tell. Returns before the connect: follow :meth:`status` and
+        ``LoadOnSelect`` (default ``mismatch``) its bitfile is loaded when the FPGA does not run
+        that build or the station can't tell. Returns before the connect: follow :meth:`status` and
         ``Target.LoadStatus``. 400 for an unknown or ambiguous one or a package that does not load
         (the old selection stays); 409 while a bitfile load or the self-test runs or the JTAG is
         held. :class:`ValueError` (nothing sent) unless it is 8 to 64 hex digits.
@@ -180,8 +181,9 @@ class DrummerTarget:
         self.write("Target.Select", _sha_text(sha256))
 
     def unselect_package(self) -> None:
-        """Unselect (``Target.Select`` = ``""``): the instance falls back to its ``PackagePath`` setting
-        (under ``LoadOnSelect``), or to no package (the design's channels go, nothing is loaded)."""
+        """Unselect (``Target.Select`` = ``""``): the instance falls back to its ``PackagePath``
+        setting (under ``LoadOnSelect``), or to no package (the design's channels go, nothing is
+        loaded)."""
         self.write("Target.Select", "")
 
     def delete_package(self, sha256: str) -> None:
@@ -210,10 +212,10 @@ class DrummerTarget:
         return self._channels.wait_bytestream(channel, timeout=timeout)
 
     def build(self) -> dict[str, Any] | None:
-        """``Target.Status``'s ``build``: which build the FPGA runs and which the selected package has,
-        and which rule decided (``fpga``, ``package``, ``marker``, ``held_back``, ``runs_package`` True,
-        False or None, ``rule``, ``text``, ``checked``, ``stale``). None on firmware without build
-        identity."""
+        """``Target.Status``'s ``build``: which build the FPGA runs and which the selected package
+        has, and which rule decided (``fpga``, ``package``, ``marker``, ``held_back``,
+        ``runs_package`` True, False or None, ``rule``, ``text``, ``checked``, ``stale``). None on
+        firmware without build identity."""
         value = self.status().get("build")
         return value if isinstance(value, dict) else None
 
@@ -355,7 +357,8 @@ def _sha_text(sha256: str) -> str:
     s = (sha256 or "").strip()
     if not _SHA_TEXT.fullmatch(s):
         raise ValueError(
-            f"{s!r} is not a SHA-256: give the package's SHA-256 or 8 or more of its first hex digits"
+            f"{s!r} is not a SHA-256: give the package's SHA-256 "
+            "or 8 or more of its first hex digits"
         )
     return s
 

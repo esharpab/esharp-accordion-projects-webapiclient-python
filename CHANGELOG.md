@@ -8,6 +8,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [7.5.0] – unreleased
 
+The first release after 7.1.0: 7.2.0, 7.3.0 and 7.4.0 were never published, and their changes (below) are part of
+7.5.0. Coming from 7.1.0, read those three entries too.
+
 Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
 
 ### Added
@@ -92,7 +95,10 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
 
 ---
 
-## [7.4.0] – 2026-11-08
+## [7.4.0] – never published
+
+> Prepared 2026-11-08 but never published (no tag, not on the package index): its changes are part of 7.5.0,
+> the first release after 7.1.0.
 
 ### Added
 
@@ -113,7 +119,10 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
 
 ---
 
-## [7.3.0] – 2026-11-08
+## [7.3.0] – never published
+
+> Prepared 2026-11-08 but never published (no tag, not on the package index): its changes are part of 7.5.0,
+> the first release after 7.1.0.
 
 ### Added
 
@@ -149,7 +158,10 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
 
 ---
 
-## [7.2.0] – 2026-11-07
+## [7.2.0] – never published
+
+> Prepared 2026-11-07 but never published (no tag, not on the package index): its changes are part of 7.5.0,
+> the first release after 7.1.0.
 
 ### Added
 

@@ -295,7 +295,9 @@ class TestLibrary:
         ]
 
     @pytest.mark.parametrize("bad", ["4f0c", "../x", "4f0c 1a2b", "", "a" * 65, "zzzzzzzz"])
-    def test_a_sha_text_that_is_not_8_to_64_hex_digits_is_refused_before_anything_is_sent(self, bad):
+    def test_a_sha_text_that_is_not_8_to_64_hex_digits_is_refused_before_anything_is_sent(
+        self, bad
+    ):
         session = make_session([])
         t = DrummerGroup(session).target("Drummer")
         with pytest.raises(ValueError, match="is not a SHA-256"):
@@ -306,7 +308,15 @@ class TestLibrary:
 
     def test_a_delete_refused_while_selected_is_a_409_naming_the_instances(self):
         session = make_session(
-            [(409, {"error": "4f0c1a2b (mh.drummer) is selected by Drummer, DUT_A: select another package there first"})]
+            [
+                (
+                    409,
+                    {
+                        "error": "4f0c1a2b (mh.drummer) is selected by Drummer, DUT_A: "
+                        "select another package there first"
+                    },
+                )
+            ]
         )
         with pytest.raises(AccordionQ2ApiError) as e:
             DrummerGroup(session).target("Drummer").delete_package(SHA)
@@ -329,7 +339,13 @@ class TestLibrary:
         session = make_session(
             [
                 (202, {"state": "validating"}),
-                (200, {"state": "done", "message": "mh.drummer: kept in the library as 4f0c1a2b (new), selected"}),
+                (
+                    200,
+                    {
+                        "state": "done",
+                        "message": "mh.drummer: kept in the library as 4f0c1a2b (new), selected",
+                    },
+                ),
             ]
         )
         status = DrummerGroup(session).target("Drummer").upload_package(file)
