@@ -30,7 +30,7 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
   `created`), the same as the station's, the Web UI's and the .NET client's. `get_recovery()` (`RecoveryWindow`:
   whether the recovery window is open, until when, whether the USB ports are off, the station's name, when the drive
   in it was made, why the window is closed and `now`, the station's clock, which `make_recovery_drive(station, now)`
-  takes when this computer's clock is off by more than an hour; `None` before 7.1.0) and `recovery_reset_admin(password, user=None)`
+  takes when the station's clock is more than an hour ahead of this computer's; `None` before 7.1.0) and `recovery_reset_admin(password, user=None)`
   (`RecoveryReset`; sends the secret of `recovery_key`, without the key or the token, never over plain HTTP to another
   host; `ValueError` without a key; 409 without a drive, 403 for a drive made by another client or browser). None
   needs a credential.

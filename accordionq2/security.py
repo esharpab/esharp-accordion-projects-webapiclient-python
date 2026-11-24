@@ -746,10 +746,10 @@ class RecoveryWindow:
     #: When the drive in the station was made (ISO 8601); None without one.
     created: str | None = None
     #: Why the window is closed: ``None`` (open), ``NoDrive``, ``Expired``, ``DriveGone``, ``Used``,
-    #: ``Invalid``, ``Outdated`` (made by an earlier firmware), ``ClockBehind``.
+    #: ``Invalid``, ``Outdated`` (made by an earlier firmware).
     why: str | None = None
-    #: The station's clock (ISO 8601, UTC) when it answered: a drive's time is judged by it. When
-    #: this computer's clock differs by more than an hour, pass it to
+    #: The station's clock (ISO 8601, UTC) when it answered: a drive's time is judged by it (a time
+    #: ahead of it is accepted). When it is more than an hour ahead of this computer's, pass it to
     #: :meth:`SecurityGroup.make_recovery_drive` as *now*.
     now: str | None = None
 
@@ -1327,9 +1327,9 @@ class SecurityGroup(ApiGroupBase):
         in the top folder of a FAT32 or exFAT USB drive. The drive's random secret stays in
         :attr:`recovery_key` (save it with :meth:`save_recovery_key` to reset from another
         process); the file holds a hash, never the secret. A drive opens the station's recovery
-        window until 24 hours after it was made (this computer's clock; at most an hour ahead of
-        the station's). When this computer's clock and the station's differ by more than an hour,
-        pass the station's, :attr:`RecoveryWindow.now`, as *now*.
+        window until 24 hours after it was made, on the station's clock (this computer's time may
+        be ahead of the station's by any amount). When the station's clock is more than an hour
+        ahead of this computer's, pass it, :attr:`RecoveryWindow.now`, as *now*.
         """
         data, key = make_recovery_drive_file(station, now)
         self.recovery_key = key

@@ -1077,7 +1077,7 @@ class TestRecoveryDrive:
                     "hint": "",
                     "steps": [],
                     "station": "A002531",
-                    "why": "ClockBehind",
+                    "why": "Expired",
                     "now": "2026-11-21T08:00:00+00:00",
                 },
             )
