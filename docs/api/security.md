@@ -111,17 +111,22 @@ In `On` the firewall drops connections that other hosts make to ports containers
 
 ## The recovery drive
 
-For a station whose admin password is lost, by someone at the station. No credential is needed: the protection is that a recovery drive has to be plugged into the station (firmware 7.1.0).
+For a station whose admin password is lost, by someone at the station (firmware 7.1.0). No credential is needed: the drive proves physical access, and the secret this client keeps proves that it made the drive. The client makes the drive, not the station.
 
 | Call | Returns | What it does |
 |---|---|---|
-| `get_recovery()` | `RecoveryWindow \| None` | `GET /api/security/recovery`: `is_open` while a recovery drive for this station is in it (at most 15 minutes, until it is taken out, one reset per insertion), `until`, `usb_ports_off` (the drive then needs a restart of the station), `hint`, `steps`; `None` before 7.1.0 |
-| `download_recovery_drive_file()` | `bytes` | `GET /api/security/recovery/drive-file`: `accordion-recovery.json`, for the top folder of a FAT32 or exFAT USB drive. It names the station and holds no secret |
-| `recovery_reset_admin(password, user=None)` | `RecoveryReset` | `POST /api/security/recovery/reset-admin` without the key or the token, over HTTPS or on the station: *user* (default `admin`) gets the password, is made Admin (made if missing) and its logins end; the mode, the keys and the other users stay. 409 when no recovery drive is in the station, 400 for a password the station refuses. This client doesn't log in |
+| `get_recovery()` | `RecoveryWindow \| None` | `GET /api/security/recovery`: `is_open` while a recovery drive for this station is in it (until 24 hours after the drive was made, until it is taken out, one reset per insertion), `until`, `usb_ports_off` (the drive then needs a restart of the station), `hint`, `steps`, `station` (the name a drive must carry), `created` (when the drive in the station was made) and `why` it is closed (such as `Outdated` for a drive made by an earlier firmware build, `Expired` after 24 hours); `None` before 7.1.0 |
+| `make_recovery_drive(station, now=None)` | `bytes` | Made here, without a call: `accordion-recovery.json` for the top folder of a FAT32 or exFAT USB drive (`kind`, `station`, `created`, `hash`; never the secret). The drive's random 32-byte secret stays in `recovery_key` |
+| `save_recovery_key(path)`, `load_recovery_key(path)` | &mdash;, `RecoveryDriveKey` | Write or read `recovery_key` in a file you choose (JSON with the secret: keep it where only you can read it), to reset from another process |
+| `recovery_reset_admin(password, user=None)` | `RecoveryReset` | `POST /api/security/recovery/reset-admin` without the key or the token, over HTTPS or on the station, with the secret of `recovery_key`: *user* (default `admin`) gets the password, is made Admin (made if missing) and its logins end; the mode, the keys and the other users stay. `ValueError` without a `recovery_key` (nothing is sent). 409 when no recovery drive is in the station, 403 when the drive was made by another client or browser (counted like a wrong password; 429 after several), 400 for a password the station refuses. This client doesn't log in |
+
+The hash is `recovery_drive_hash(secret, station, created)`: the lower-case hex SHA-256 of the secret's bytes, a 0x00 byte, the station's name in upper case, a 0x00 byte and `created` as the file carries it (`2026-11-24T08:00:00Z`). The station, the Web UI and the .NET client compute the same. A drive opens the recovery window until 24 hours after `created`, on the station's clock (`created` may be up to an hour ahead of it).
 
 ```python
+window = client.security.get_recovery()
 with open("E:/accordion-recovery.json", "wb") as f:   # the top folder of a FAT32 or exFAT USB drive
-    f.write(client.security.download_recovery_drive_file())
+    f.write(client.security.make_recovery_drive(window.station))
+client.security.save_recovery_key("recovery-key.json")  # optional: to reset from another process
 # plug the drive into the station (restart the station with it in when its USB ports are off), then:
 window = client.security.get_recovery()
 if window is not None and window.is_open:

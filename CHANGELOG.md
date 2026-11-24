@@ -21,12 +21,17 @@ Firmware 7.1.0's security calls and its 429 (FW7_PLAN CLI-05 follow-up).
   `last_factory_reset`), with their models (`LoginResponse`, `UserInfo`, `MeInfo`, `SecurityState`, `CertificateInfo`,
   `SecurityEvents`, `HostSecurity`, `HostSettings`, `ExtensionsReport`, `FactoryResetPreview`, ...) and
   `SecurityMode`, `StationRole`. docs/api/security.md.
-- **The recovery drive** (firmware 7.1.0), for a station whose admin password is lost: `get_recovery()`
-  (`RecoveryWindow`: whether the recovery window is open, until when, whether the USB ports are off; `None` before
-  7.1.0), `download_recovery_drive_file()` (the bytes of `accordion-recovery.json`, to copy to a USB drive; it names
-  the station and holds no secret) and `recovery_reset_admin(password, user=None)` (`RecoveryReset`; while a recovery
-  drive for the station is in it, anyone at the station can set an admin password; sent without the key or the token,
-  never over plain HTTP to another host; 409 without a drive). None needs a credential.
+- **The recovery drive** (firmware 7.1.0), for a station whose admin password is lost. The client makes the drive,
+  not the station: `make_recovery_drive(station)` returns the bytes of `accordion-recovery.json` (`kind`, `station`,
+  `created`, `hash`; never the secret) and keeps the drive's random secret in `recovery_key` (`RecoveryDriveKey`),
+  which `save_recovery_key(path)` and `load_recovery_key(path)` write and read in a file the caller chooses.
+  `recovery_drive_hash` is the hash's encoding (SHA-256 of the secret, 0x00, the station's name in upper case, 0x00,
+  `created`), the same as the station's, the Web UI's and the .NET client's. `get_recovery()` (`RecoveryWindow`:
+  whether the recovery window is open, until when, whether the USB ports are off, the station's name, when the drive
+  in it was made and why the window is closed; `None` before 7.1.0) and `recovery_reset_admin(password, user=None)`
+  (`RecoveryReset`; sends the secret of `recovery_key`, without the key or the token, never over plain HTTP to another
+  host; `ValueError` without a key; 409 without a drive, 403 for a drive made by another client or browser). None
+  needs a credential.
 - `claim(password, name=None)` takes no setup code (firmware 7.1.0): in security mode Off and Report it makes the
   first admin of an unclaimed station from any address, over HTTPS; in On the station answers 409, and an unclaimed
   station is claimed with the recovery drive (`recovery_reset_admin`). `set_user_role` and `remove_user` answer 409

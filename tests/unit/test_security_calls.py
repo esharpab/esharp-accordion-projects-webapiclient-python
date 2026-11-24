@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import traceback
+from datetime import UTC
 from typing import Any, ClassVar
 from unittest.mock import MagicMock
 
@@ -962,13 +963,87 @@ class TestRecoveryDrive:
         assert station.sent()[:2] == ("GET", "/api/security/recovery")
         assert station.security.get_recovery() is None  # a station before 7.1.0
 
-    def test_the_drive_file(self):
-        data = (
-            b'{"kind":"accordion-recovery","station":"A002531","created":"2026-11-23T10:00:00Z"}\n'
+    def test_the_window_names_the_station_and_the_drive(self):
+        station = Station(
+            (
+                200,
+                {
+                    "window": "closed",
+                    "until": None,
+                    "usbPortsOff": False,
+                    "hint": "made by an earlier firmware",
+                    "steps": [],
+                    "station": "A002531",
+                    "created": "2026-11-24T08:00:00+00:00",
+                    "why": "Outdated",
+                },
+            )
         )
-        station = Station((200, data))
-        assert station.security.download_recovery_drive_file() == data
-        assert station.sent()[:2] == ("GET", "/api/security/recovery/drive-file")
+        window = station.security.get_recovery()
+        assert window is not None and not window.is_open
+        assert (window.station, window.created, window.why) == (
+            "A002531",
+            "2026-11-24T08:00:00+00:00",
+            "Outdated",
+        )
+
+    def test_the_hash_vector(self):
+        # The vector the station, the Web UI and the .NET client test too
+        secret = bytes(range(32))
+        expected = "c99869a7262e1fc9bf8806c9dde1ee147b87cf24ac8668913e7e934bb8227d2b"
+        assert (
+            security_module.recovery_drive_hash(secret, "a002531", "2026-11-24T08:00:00Z")
+            == expected
+        )
+        assert (
+            security_module.recovery_drive_hash(secret, " A002531 ", "2026-11-24T08:00:00Z")
+            == expected
+        )
+        assert (
+            security_module.recovery_drive_hash(secret, "A002531", "2026-11-24T08:00:01Z")
+            != expected
+        )
+
+    def test_the_client_makes_the_drive_and_keeps_the_secret(self, tmp_path):
+        from datetime import datetime
+
+        station = Station()
+        data = station.security.make_recovery_drive(
+            "A002531", datetime(2026, 11, 24, 9, 0, 0, 123000, tzinfo=UTC)
+        )
+        assert station.calls == 0  # the station doesn't make it
+        text = data.decode("utf-8")
+        assert text.endswith("}\n")
+        file = json.loads(text)
+        assert list(file) == ["kind", "station", "created", "hash"]
+        assert (file["kind"], file["station"], file["created"]) == (
+            "accordion-recovery",
+            "A002531",
+            "2026-11-24T09:00:00Z",
+        )
+        key = station.security.recovery_key
+        assert key is not None and len(key.secret) == 64
+        assert key.secret not in text and key.secret not in repr(key)
+        assert file["hash"] == security_module.recovery_drive_hash(
+            bytes.fromhex(key.secret), "A002531", "2026-11-24T09:00:00Z"
+        )
+        station.security.save_recovery_key(tmp_path / "key.json")
+        saved = json.loads((tmp_path / "key.json").read_text(encoding="utf-8"))
+        assert saved == {
+            "kind": "accordion-recovery-key",
+            "station": "A002531",
+            "created": "2026-11-24T09:00:00Z",
+            "secret": key.secret,
+        }
+        other = Station()
+        assert other.security.load_recovery_key(tmp_path / "key.json") == key
+        (tmp_path / "bad.json").write_text(
+            '{"kind":"accordion-recovery-key","station":"A","created":"x","secret":"zz"}'
+        )
+        with pytest.raises(ValueError):
+            other.security.load_recovery_key(tmp_path / "bad.json")
+        station.security.make_recovery_drive("A002531")
+        assert station.security.recovery_key.secret != key.secret  # a new drive, a new secret
 
     def test_the_reset_goes_without_the_key_and_the_token_and_doesnt_log_in(self):
         answer = {
@@ -977,15 +1052,43 @@ class TestRecoveryDrive:
             "message": "Sign in",
         }
         station = Station((200, answer), (200, answer), api_key=KEY, bearer_token=TOKEN)
+        station.security.make_recovery_drive("A002531")
+        secret = station.security.recovery_key.secret
         result = station.security.recovery_reset_admin(PASSWORD)
         method, path, body, headers = station.sent()
         assert (method, path) == ("POST", "/api/security/recovery/reset-admin")
-        assert body == {"password": PASSWORD}
+        assert body == {"password": PASSWORD, "secret": secret}
         assert "X-Api-Key" not in headers and "Authorization" not in headers
         assert result.user.name == "admin" and not result.created
         assert station.session.request_headers()["Authorization"] == f"Bearer {TOKEN}"
         station.security.recovery_reset_admin(PASSWORD, user="lab")
-        assert station.sent()[2] == {"password": PASSWORD, "user": "lab"}
+        assert station.sent()[2] == {"password": PASSWORD, "secret": secret, "user": "lab"}
+
+    def test_without_a_key_nothing_is_sent(self):
+        station = Station()
+        with pytest.raises(ValueError, match="make_recovery_drive"):
+            station.security.recovery_reset_admin(PASSWORD)
+        assert station.calls == 0
+        with pytest.raises(ValueError):
+            station.security.save_recovery_key("unused.json")
+
+    def test_a_drive_made_elsewhere_is_the_stations_403(self):
+        station = Station(
+            (
+                403,
+                {
+                    "error": "This recovery drive was made in another browser; "
+                    "make a new one in this browser",
+                    "requires": "Anonymous",
+                },
+            )
+        )
+        station.security.make_recovery_drive("A002531")
+        with pytest.raises(AccordionQ2ApiError) as info:
+            station.security.recovery_reset_admin(PASSWORD)
+        assert info.value.status_code == 403
+        assert "made in another browser" in str(info.value)
+        assert station.security.recovery_key.secret not in str(info.value)
 
     def test_without_a_drive_it_is_the_stations_409(self):
         station = Station(
@@ -997,6 +1100,7 @@ class TestRecoveryDrive:
                 },
             )
         )
+        station.security.make_recovery_drive("A002531")
         with pytest.raises(AccordionQ2ApiError) as info:
             station.security.recovery_reset_admin(PASSWORD)
         assert info.value.status_code == 409

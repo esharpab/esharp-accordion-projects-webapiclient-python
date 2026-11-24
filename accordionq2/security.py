@@ -19,10 +19,13 @@ Fields the station returns are kept as it sends them: times as ISO 8601 strings,
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
+import secrets
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -724,8 +727,8 @@ class FactoryResetRecord:
 class RecoveryWindow:
     """Whether a recovery drive for the station is in it (firmware 7.1.0).
 
-    ``window`` is ``open`` while an admin password can be set (at most 15 minutes, until the
-    drive is taken out, one reset per insertion), else ``closed``.
+    ``window`` is ``open`` while an admin password can be set (until 24 hours after the drive
+    was made, until the drive is taken out, one reset per insertion), else ``closed``.
     """
 
     window: str
@@ -735,6 +738,14 @@ class RecoveryWindow:
     usb_ports_off: bool
     hint: str
     steps: tuple[str, ...]
+    #: The station's name (its serial number), which a drive must carry
+    #: (:meth:`SecurityGroup.make_recovery_drive`).
+    station: str | None = None
+    #: When the drive in the station was made (ISO 8601); None without one.
+    created: str | None = None
+    #: Why the window is closed: ``None`` (open), ``NoDrive``, ``Expired``, ``DriveGone``, ``Used``,
+    #: ``Invalid``, ``Outdated`` (made by an earlier firmware), ``ClockBehind``.
+    why: str | None = None
 
     @property
     def is_open(self) -> bool:
@@ -748,6 +759,9 @@ class RecoveryWindow:
             usb_ports_off=bool(d.get("usbPortsOff")),
             hint=str(d.get("hint", "")),
             steps=_strs(d.get("steps")),
+            station=_opt_str(d.get("station")),
+            created=_opt_str(d.get("created")),
+            why=_opt_str(d.get("why")),
         )
 
 
@@ -767,6 +781,107 @@ class RecoveryReset:
             created=bool(d.get("created")),
             message=str(d.get("message", "")),
         )
+
+
+#: The recovery drive's file, in the top folder of a FAT32 or exFAT USB drive.
+RECOVERY_DRIVE_FILE = "accordion-recovery.json"
+_RECOVERY_KIND = "accordion-recovery"
+_RECOVERY_KEY_KIND = "accordion-recovery-key"
+#: The recovery drive's secret: 32 random bytes, sent as 64 hex digits.
+RECOVERY_SECRET_BYTES = 32
+
+
+def recovery_drive_hash(secret: bytes, station: str, created: str) -> str:
+    """The recovery drive's hash: lower-case hex SHA-256 over the secret's bytes, a 0x00 byte,
+    the station's name in upper case (UTF-8), a 0x00 byte and *created* as the file carries it
+    (UTF-8). The station, the Web UI and the .NET client compute the same."""
+    data = (
+        secret
+        + b"\x00"
+        + station.strip().upper().encode("utf-8")
+        + b"\x00"
+        + created.encode("utf-8")
+    )
+    return hashlib.sha256(data).hexdigest()
+
+
+def format_recovery_created(at: datetime) -> str:
+    """A time as the recovery drive's file carries it: ``YYYY-MM-DDTHH:MM:SSZ`` (UTC)."""
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=UTC)
+    return at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryDriveKey:
+    """What the client keeps of a recovery drive it made: the station, when it was made and the
+    secret (64 hex digits). The secret is the drive's password: keep the key where only you can
+    read it. Its ``repr()`` doesn't show the secret."""
+
+    station: str
+    created: str
+    secret: str = field(repr=False)
+
+    def to_json(self) -> str:
+        """The key as JSON (kind, station, created, secret), as the .NET client writes it too."""
+        return json.dumps(
+            {
+                "kind": _RECOVERY_KEY_KIND,
+                "station": self.station,
+                "created": self.created,
+                "secret": self.secret,
+            },
+            separators=(",", ":"),
+        )
+
+    @classmethod
+    def from_json(cls, text: str) -> RecoveryDriveKey:
+        """A key from :meth:`to_json`; ``ValueError`` for anything else."""
+        try:
+            d = json.loads(text)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"Not a recovery drive key: {error.msg}") from None
+        if (
+            not isinstance(d, dict)
+            or d.get("kind") != _RECOVERY_KEY_KIND
+            or not all(isinstance(d.get(k), str) for k in ("station", "created", "secret"))
+        ):
+            raise ValueError("Not a recovery drive key")
+        secret = d["secret"]
+        if len(secret) != 2 * RECOVERY_SECRET_BYTES or any(
+            c not in "0123456789abcdefABCDEF" for c in secret
+        ):
+            raise ValueError("The recovery drive key's secret isn't 64 hex digits")
+        return cls(station=d["station"], created=d["created"], secret=secret.lower())
+
+    def save(self, path: str | Path) -> None:
+        """Write the key to *path* (the caller chooses where: it holds the secret)."""
+        Path(path).write_text(self.to_json() + "\n", encoding="utf-8")
+
+    @classmethod
+    def load(cls, path: str | Path) -> RecoveryDriveKey:
+        """Read a key :meth:`save` wrote."""
+        return cls.from_json(Path(path).read_text(encoding="utf-8"))
+
+
+def make_recovery_drive_file(
+    station: str, now: datetime | None = None
+) -> tuple[bytes, RecoveryDriveKey]:
+    """A new recovery drive for *station* made at *now* (default: this computer's clock): the
+    bytes of ``accordion-recovery.json`` (kind, station, created, hash; never the secret) and the
+    key to keep."""
+    if not station or not station.strip():
+        raise ValueError("The station's name is needed")
+    raw = secrets.token_bytes(RECOVERY_SECRET_BYTES)
+    created = format_recovery_created(now or datetime.now(UTC))
+    body = {
+        "kind": _RECOVERY_KIND,
+        "station": station.strip(),
+        "created": created,
+        "hash": recovery_drive_hash(raw, station, created),
+    }
+    key = RecoveryDriveKey(station=station.strip().upper(), created=created, secret=raw.hex())
+    return (json.dumps(body, separators=(",", ":")) + "\n").encode("utf-8"), key
 
 
 def _q(value: str) -> str:
@@ -1175,26 +1290,63 @@ class SecurityGroup(ApiGroupBase):
             raise
         return RecoveryWindow.from_dict(self._obj(d))
 
-    def download_recovery_drive_file(self) -> bytes:
-        """The recovery drive's file, ``accordion-recovery.json`` (anyone, every mode).
+    @property
+    def recovery_key(self) -> RecoveryDriveKey | None:
+        """The key of the recovery drive this client made (:meth:`make_recovery_drive`) or
+        loaded (:meth:`load_recovery_key`); :meth:`recovery_reset_admin` sends its secret."""
+        return getattr(self, "_recovery_key", None)
 
-        Save it under that name in the top folder of a FAT32 or exFAT USB drive and plug that
-        into the station. It names the station and holds no secret.
+    @recovery_key.setter
+    def recovery_key(self, key: RecoveryDriveKey | None) -> None:
+        self._recovery_key = key
+
+    def make_recovery_drive(self, station: str, now: datetime | None = None) -> bytes:
+        """Make a recovery drive for *station* here, without the station.
+
+        *station* is the station's name (its serial number; :meth:`get_recovery` answers it as
+        ``station``). Returns the bytes of ``accordion-recovery.json``: save them under that name
+        in the top folder of a FAT32 or exFAT USB drive. The drive's random secret stays in
+        :attr:`recovery_key` (save it with :meth:`save_recovery_key` to reset from another
+        process); the file holds a hash, never the secret. A drive opens the station's recovery
+        window until 24 hours after it was made (this computer's clock; at most an hour ahead of
+        the station's).
         """
-        return self._get_bytes("api/security/recovery/drive-file")
+        data, key = make_recovery_drive_file(station, now)
+        self.recovery_key = key
+        return data
+
+    def save_recovery_key(self, path: str | Path) -> None:
+        """Write :attr:`recovery_key` to *path*, which the caller chooses: it holds the secret."""
+        if self.recovery_key is None:
+            raise ValueError("This client hasn't made a recovery drive (make_recovery_drive)")
+        self.recovery_key.save(path)
+
+    def load_recovery_key(self, path: str | Path) -> RecoveryDriveKey:
+        """Read a key :meth:`save_recovery_key` wrote into :attr:`recovery_key`."""
+        self.recovery_key = RecoveryDriveKey.load(path)
+        return self.recovery_key
 
     def recovery_reset_admin(self, password: str, user: str | None = None) -> RecoveryReset:
         """Set an admin's password while a recovery drive for this station is in it (anyone,
-        over HTTPS or on the station). Sent without the key or the login token.
+        over HTTPS or on the station). Sent without the key or the login token, with the secret
+        of :attr:`recovery_key`: only the client that made the drive can use it.
 
         *user* (default ``admin``) gets the password; it is made as Admin if missing, made
         Admin if not, and its logins end. The mode, the keys and the other users stay. One
-        reset per insertion of the drive. 409 when no recovery drive is in the station, 400 for
-        a password the station refuses. This client doesn't log in: call :meth:`login`.
+        reset per insertion of the drive. 409 when no recovery drive is in the station, 403 when
+        the drive was made by another client or browser (counted like a wrong password), 400 for
+        a password the station refuses. ``ValueError`` without a :attr:`recovery_key` (nothing
+        is sent). This client doesn't log in: call :meth:`login`.
         """
         password = _hide(password)
         self._session.require_https_or_loopback("A password reset with the recovery drive")
-        body: dict[str, Any] = {"password": password}
+        key = self.recovery_key
+        if key is None:
+            raise ValueError(
+                "This client has no recovery drive key: make the drive with make_recovery_drive, "
+                "or load its key with load_recovery_key"
+            )
+        body: dict[str, Any] = {"password": password, "secret": _hide(key.secret)}
         if user is not None:
             body["user"] = user
         return RecoveryReset.from_dict(
