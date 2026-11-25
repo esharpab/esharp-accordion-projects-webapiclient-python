@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [7.5.0] – unreleased
+## [7.5.0] – 2026-11-25
 
 The first release after 7.1.0: 7.2.0, 7.3.0 and 7.4.0 were never published, and their changes (below) are part of
 7.5.0. Coming from 7.1.0, read those three entries too.
